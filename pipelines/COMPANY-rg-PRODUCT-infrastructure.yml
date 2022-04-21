@@ -1,0 +1,205 @@
+on:
+  push:
+    branches:
+    - '*'
+    paths:
+    - infrastructure/*
+  pull-request:
+    branches-ignore:
+    - '*'
+env:
+  template: variables/development.yml
+  buildPlatform: Any CPU
+  buildConfiguration: Release
+jobs:
+  development_Stage_deploy_landing_zone:
+    env:
+      template: variables/development.yml
+    if: (github.ref != 'refs/heads/main')
+    steps:
+    - uses: actions/checkout@v2
+    - # There is no conversion path for templates in GitHub Actions
+      run: |
+        #steps/landingzone-infrastructure-steps.yml
+        armPath: infrastructure
+        subscriptionId: ${{ env.subscriptionId }}
+        subscriptionName: ${{ env.subscriptionName }}
+        rgName: ${{ env.rgName }}
+        rgLocation: ${{ env.rgLocation }}
+        appiName: ${{ env.appiName }}
+        kvName: ${{ env.kvName }}
+        stName: ${{ env.stName }}
+        workName: ${{ env.workName }}
+  development_Stage_deploy_appcs_infrastructure:
+    needs:
+    - development_Stage_deploy_landing_zone
+    env:
+      template: variables/development.yml
+    if: (github.ref != 'refs/heads/main')
+    steps:
+    - uses: actions/checkout@v2
+    - # There is no conversion path for templates in GitHub Actions
+      run: |
+        #steps/appcs-infrastructure-steps.yml
+        armPath: infrastructure
+        subscriptionId: ${{ env.subscriptionId }}
+        subscriptionName: ${{ env.subscriptionName }}
+        rgName: ${{ env.rgName }}
+        rgLocation: ${{ env.rgLocation }}
+        appcsName: ${{ env.appcsName }}
+        appcsSku: ${{ env.appcsSku }}
+  development_Stage_deploy_sb_infrastructure:
+    needs:
+    - development_Stage_deploy_appcs_infrastructure
+    env:
+      template: variables/development.yml
+    if: (github.ref != 'refs/heads/main')
+    steps:
+    - uses: actions/checkout@v2
+    - # There is no conversion path for templates in GitHub Actions
+      run: |
+        #steps/sb-infrastructure-steps.yml
+        armPath: infrastructure
+        subscriptionId: ${{ env.subscriptionId }}
+        subscriptionName: ${{ env.subscriptionName }}
+        rgName: ${{ env.rgName }}
+        rgLocation: ${{ env.rgLocation }}
+        sbName: ${{ env.sbName }}
+        sbSku: ${{ env.sbSku }}
+  development_Stage_deploy_func_infrastructure:
+    needs:
+    - development_Stage_deploy_appcs_infrastructure
+    env:
+      template: variables/development.yml
+    if: (github.ref != 'refs/heads/main')
+    steps:
+    - uses: actions/checkout@v2
+    - # There is no conversion path for templates in GitHub Actions
+      run: |
+        #steps/func-infrastructure-steps.yml
+        armPath: infrastructure
+        subscriptionId: ${{ env.subscriptionId }}
+        subscriptionName: ${{ env.subscriptionName }}
+        rgName: ${{ env.rgName }}
+        rgLocation: ${{ env.rgLocation }}
+        rgEnvironment: ${{ env.rgEnvironment }}
+        appiKey: ${{ env.appiKey }} 
+        appiConnection: ${{ env.appiConnection }}
+        funcName: ${{ env.funcName }}
+        stName: ${{ env.stName }}
+        workName: ${{ env.workName }}
+  development_Stage_deploy_webjob_infrastructure:
+    needs:
+    - development_Stage_deploy_appcs_infrastructure
+    env:
+      template: variables/development.yml
+    if: (github.ref != 'refs/heads/main')
+    steps:
+    - uses: actions/checkout@v2
+    - # There is no conversion path for templates in GitHub Actions
+      run: |
+        #steps/webjob-infrastructure-steps.yml
+        armPath: infrastructure
+        subscriptionId: ${{ env.subscriptionId }}
+        subscriptionName: ${{ env.subscriptionName }}
+        rgName: ${{ env.rgName }}
+        rgLocation: ${{ env.rgLocation }}
+        rgEnvironment: ${{ env.rgEnvironment }}
+        planName: ${{ env.planName }}
+        webjobName: ${{ env.webjobName }}
+  production_Stage_deploy_landing_zone:
+    env:
+      template: variables/production.yml
+    if: (github.ref == 'refs/heads/main')
+    steps:
+    - uses: actions/checkout@v2
+    - # There is no conversion path for templates in GitHub Actions
+      run: |
+        #steps/landingzone-infrastructure-steps.yml
+        armPath: infrastructure
+        subscriptionId: ${{ env.subscriptionId }}
+        subscriptionName: ${{ env.subscriptionName }}
+        rgName: ${{ env.rgName }}
+        rgLocation: ${{ env.rgLocation }}
+        appiName: ${{ env.appiName }}
+        kvName: ${{ env.kvName }}
+        stName: ${{ env.stName }}
+        workName: ${{ env.workName }}
+  production_Stage_deploy_appcs_infrastructure:
+    needs:
+    - production_Stage_deploy_landing_zone
+    env:
+      template: variables/production.yml
+    if: (github.ref == 'refs/heads/main')
+    steps:
+    - uses: actions/checkout@v2
+    - # There is no conversion path for templates in GitHub Actions
+      run: |
+        #steps/appcs-infrastructure-steps.yml
+        armPath: infrastructure
+        subscriptionId: ${{ env.subscriptionId }}
+        subscriptionName: ${{ env.subscriptionName }}
+        rgName: ${{ env.rgName }}
+        rgLocation: ${{ env.rgLocation }}
+        appcsName: ${{ env.appcsName }}
+        appcsSku: ${{ env.appcsSku }}
+  production_Stage_deploy_sb_infrastructure:
+    needs:
+    - production_Stage_deploy_appcs_infrastructure
+    env:
+      template: variables/production.yml
+    if: (github.ref == 'refs/heads/main')
+    steps:
+    - uses: actions/checkout@v2
+    - # There is no conversion path for templates in GitHub Actions
+      run: |
+        #steps/sb-infrastructure-steps.yml
+        armPath: infrastructure
+        subscriptionId: ${{ env.subscriptionId }}
+        subscriptionName: ${{ env.subscriptionName }}
+        rgName: ${{ env.rgName }}
+        rgLocation: ${{ env.rgLocation }}
+        sbName: ${{ env.sbName }}
+        sbSku: ${{ env.sbSku }}
+  production_Stage_deploy_func_infrastructure:
+    needs:
+    - production_Stage_deploy_appcs_infrastructure
+    env:
+      template: variables/production.yml
+    if: (github.ref == 'refs/heads/main')
+    steps:
+    - uses: actions/checkout@v2
+    - # There is no conversion path for templates in GitHub Actions
+      run: |
+        #steps/func-infrastructure-steps.yml
+        armPath: infrastructure
+        subscriptionId: ${{ env.subscriptionId }}
+        subscriptionName: ${{ env.subscriptionName }}
+        rgName: ${{ env.rgName }}
+        rgLocation: ${{ env.rgLocation }}
+        rgEnvironment: ${{ env.rgEnvironment }}
+        appiKey: ${{ env.appiKey }} 
+        appiConnection: ${{ env.appiConnection }}
+        funcName: ${{ env.funcName }}
+        stName: ${{ env.stName }}
+        workName: ${{ env.workName }}
+  production_Stage_deploy_webjob_infrastructure:
+    needs:
+    - production_Stage_deploy_appcs_infrastructure
+    env:
+      template: variables/production.yml
+    if: (github.ref == 'refs/heads/main')
+    steps:
+    - uses: actions/checkout@v2
+    - # There is no conversion path for templates in GitHub Actions
+      run: |
+        #steps/webjob-infrastructure-steps.yml
+        armPath: infrastructure
+        subscriptionId: ${{ env.subscriptionId }}
+        subscriptionName: ${{ env.subscriptionName }}
+        rgName: ${{ env.rgName }}
+        rgLocation: ${{ env.rgLocation }}
+        rgEnvironment: ${{ env.rgEnvironment }}
+        planName: ${{ env.planName }}
+        webjobName: ${{ env.webjobName }}
+                    

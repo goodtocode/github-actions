@@ -1,0 +1,17 @@
+env:
+  tenantId: 00000000-0000-0000-0000-000000000000
+  subscriptionId: 00000000-0000-0000-0000-000000000000
+  subscriptionName: COMPANY-PRODUCT-001
+  artifactsPath: ${{ github.workspace }}
+  tempPath: ${{ env.Agent.TempDirectory }}/ymltemp
+  archiveFile: archive.zip
+  pipelinesPath: ${{ github.workspace }}/pipelines
+  infrastructurePath: ${{ github.workspace }}/infrastructure
+  testsPath: ${{ github.workspace }}/tests
+  srcPath: ${{ github.workspace }}/src
+  funcPath: ${{ github.workspace }}/src/PRODUCT.Functions
+  webjobPath: ${{ github.workspace }}/src/PRODUCT.WebJob
+  logicPath: ${{ github.workspace }}/src/PRODUCT.LogicApps.NAME
+  buildConfiguration: Release
+  MSBUILDSINGLELOADCONTEXT: 1
+                    

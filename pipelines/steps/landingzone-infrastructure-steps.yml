@@ -1,0 +1,53 @@
+#Note: the 'AZURE_SP' secret is required to be added into GitHub Secrets. See this blog post for details: https://samlearnsazure.blog/2019/12/13/github-actions/
+env:
+  armPath: .
+  subscriptionId: 00000000-0000-0000-0000-000000000000
+  subscriptionName: COMPANY-PRODUCT-001
+  rgName: COMPANY-rg-PRODUCT-001
+  rgLocation: West US 2
+  appiName: appi-PRODUCT-ENVIRONMENT-001
+  kvName: kv-PRODUCT-ENVIRONMENT-001
+  stName: stPRODUCTENVIRONMENT001
+  workName: work-PRODUCT-ENVIRONMENT-001
+jobs:
+  build:
+    steps:
+    - uses: actions/checkout@v2
+    - # "Note: the 'AZURE_SP' secret is required to be added into GitHub Secrets. See this blog post for details: https://samlearnsazure.blog/2019/12/13/github-actions/"
+      name: Azure Login
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_SP }}
+    - name: Validate ${{ env. parameters.stName   }}
+      uses: Azure/cli@v1.0.0
+      with:
+        inlineScript: az deployment group create --resource-group ${{ env. parameters.rgName  }} --template-file ${{ env. parameters.armPath  }}/st-storageaccount.json --parameters  ${{ env. parameters.armPath  }}/st-storageaccount.parameters.json -name "${{ env. parameters.stName   }}"
+    - name: Deploy ${{ env. parameters.stName   }}
+      uses: Azure/cli@v1.0.0
+      with:
+        inlineScript: az deployment group create --resource-group ${{ env. parameters.rgName  }} --template-file ${{ env. parameters.armPath  }}/st-storageaccount.json --parameters  ${{ env. parameters.armPath  }}/st-storageaccount.parameters.json -name "${{ env. parameters.stName   }}"
+    - name: Validate ${{ env. parameters.workName   }}
+      uses: Azure/cli@v1.0.0
+      with:
+        inlineScript: az deployment group create --resource-group ${{ env. parameters.rgName  }} --template-file ${{ env. parameters.armPath  }}/work-loganalyticsworkspace.json --parameters  ${{ env. parameters.armPath  }}/work-loganalyticsworkspace.parameters.json -name "${{ env. parameters.workName   }}"
+    - name: Deploy ${{ env. parameters.workName   }}
+      uses: Azure/cli@v1.0.0
+      with:
+        inlineScript: az deployment group create --resource-group ${{ env. parameters.rgName  }} --template-file ${{ env. parameters.armPath  }}/work-loganalyticsworkspace.json --parameters  ${{ env. parameters.armPath  }}/work-loganalyticsworkspace.parameters.json -name "${{ env. parameters.workName   }}"
+    - name: Validate ${{ env. parameters.appiName   }}
+      uses: Azure/cli@v1.0.0
+      with:
+        inlineScript: az deployment group create --resource-group ${{ env. parameters.rgName  }} --template-file ${{ env. parameters.armPath  }}/appi-applicationinsights.json --parameters  ${{ env. parameters.armPath  }}/appi-applicationinsights.parameters.json -name "${{ env. parameters.appiName   }}" -workName "${{ env. parameters.workName   }}"
+    - name: Deploy ${{ env. parameters.appiName   }}
+      uses: Azure/cli@v1.0.0
+      with:
+        inlineScript: az deployment group create --resource-group ${{ env. parameters.rgName  }} --template-file ${{ env. parameters.armPath  }}/appi-applicationinsights.json --parameters  ${{ env. parameters.armPath  }}/appi-applicationinsights.parameters.json -name "${{ env. parameters.appiName   }}" -workName "${{ env. parameters.workName   }}"
+    - name: Validate ${{ env. parameters.kvName   }}
+      uses: Azure/cli@v1.0.0
+      with:
+        inlineScript: az deployment group create --resource-group ${{ env. parameters.rgName  }} --template-file ${{ env. parameters.armPath  }}/kv-keyvault.json --parameters  ${{ env. parameters.armPath  }}/kv-keyvault.parameters.json -name "${{ env. parameters.kvName   }}"
+    - name: Deploy ${{ env. parameters.kvName   }}
+      uses: Azure/cli@v1.0.0
+      with:
+        inlineScript: az deployment group create --resource-group ${{ env. parameters.rgName  }} --template-file ${{ env. parameters.armPath  }}/kv-keyvault.json --parameters  ${{ env. parameters.armPath  }}/kv-keyvault.parameters.json -name "${{ env. parameters.kvName   }}"
+                    

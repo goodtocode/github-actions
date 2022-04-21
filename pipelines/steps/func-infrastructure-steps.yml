@@ -1,0 +1,32 @@
+#Note: the 'AZURE_SP' secret is required to be added into GitHub Secrets. See this blog post for details: https://samlearnsazure.blog/2019/12/13/github-actions/
+env:
+  armPath: .
+  subscriptionId: 00000000-0000-0000-0000-000000000000
+  subscriptionName: COMPANY-PRODUCT-001
+  rgName: COMPANY-rg-PRODUCT-001
+  rgLocation: West US 2
+  rgEnvironment: Development
+  appiKey: ''
+  appiConnection: ''
+  funcName: func-PRODUCT-ENVIRONMENT-001
+  funcVersion: 4
+  stName: stPRODUCTENVIRONMENT001
+  workName: work-PRODUCT-ENVIRONMENT-001
+jobs:
+  build:
+    steps:
+    - uses: actions/checkout@v2
+    - # "Note: the 'AZURE_SP' secret is required to be added into GitHub Secrets. See this blog post for details: https://samlearnsazure.blog/2019/12/13/github-actions/"
+      name: Azure Login
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_SP }}
+    - name: Validate ${{ env. parameters.funcName  }}
+      uses: Azure/cli@v1.0.0
+      with:
+        inlineScript: az deployment group create --resource-group ${{ env. parameters.rgName  }} --template-file ${{ env. parameters.armPath  }}/func-functionsapp.json --parameters  ${{ env. parameters.armPath  }}/func-functionsapp.parameters.json -name "${{ env. parameters.funcName  }}" -funcVersion "${{ env. parameters.funcVersion  }}" -workName "${{ env. parameters.workName  }}" -stName "${{ env. parameters.stName  }}" -appiKey "${{ env. parameters.appiKey  }}" -appiConnection "${{ env. parameters.appiConnection  }}" -funcRuntime "dotnet-isolated" -rgEnvironment "${{ env. parameters.rgEnvironment  }}"
+    - name: Deploy ${{ env. parameters.funcName  }}
+      uses: Azure/cli@v1.0.0
+      with:
+        inlineScript: az deployment group create --resource-group ${{ env. parameters.rgName  }} --template-file ${{ env. parameters.armPath  }}/func-functionsapp.json --parameters  ${{ env. parameters.armPath  }}/func-functionsapp.parameters.json -name "${{ env. parameters.funcName  }}" -funcVersion "${{ env. parameters.funcVersion  }}" -workName "${{ env. parameters.workName  }}" -stName "${{ env. parameters.stName  }}" -appiKey "${{ env. parameters.appiKey  }}" -appiConnection "${{ env. parameters.appiConnection  }}" -funcRuntime "dotnet-isolated" -rgEnvironment "${{ env. parameters.rgEnvironment  }}"
+                    

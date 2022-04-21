@@ -1,0 +1,54 @@
+#Error (line 18): the step 'DeleteFiles@1' does not have a conversion path yet
+#Note: This is a third party action and currently only supports Linux: https://github.com/marketplace/actions/create-zip-file
+#Error (line 41): the step 'DeleteFiles@1' does not have a conversion path yet
+env:
+  artifactsPath: .
+  archiveFile: '*.zip'
+  funcPath: .
+  funcProject: '*.csproj'
+  nugetPathFile: .nuget/NuGet.config
+  buildConfiguration: Release
+  tempPath: ./ymltemp
+  scriptsPath: ./pipelines/scripts
+  versionToReplace: 1.0.0
+jobs:
+  build:
+    steps:
+    - uses: actions/checkout@v2
+    - # "Error: the step 'DeleteFiles@1' does not have a conversion path yet"
+      run: |
+        echo "Error: the step 'DeleteFiles@1' does not have a conversion path yet"
+        #task: DeleteFiles@1
+        #inputs:
+        #  sourcefolder: ${{ env. parameters.tempPath  }}
+        #  contents: '**/*'
+        #  removedotfiles: true
+    - name: use .net 6.x
+      uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: 6.x
+    - name: Set-Version.ps1
+      shell: powershell
+    - name: dotnet restore
+      run: dotnet restore ${{ env. parameters.funcPath  }}/**/${{ env. parameters.funcProject  }}
+    - name: dotnet build
+      run: dotnet build ${{ env. parameters.funcPath  }}/**/${{ env. parameters.funcProject  }} --output ${{ env. parameters.tempPath  }} --configuration ${{ env. parameters.buildConfiguration  }}
+    - # 'Note: This is a third party action and currently only supports Linux: https://github.com/marketplace/actions/create-zip-file'
+      name: Archive ${{ env. parameters.archiveFile  }}
+      uses: montudor/action-zip@v0.1.0
+      with:
+        args: zip -qq -r ${{ env. parameters.artifactsPath  }}/${{ env. parameters.archiveFile  }} ${{ env. parameters.tempPath  }}
+    - # "Error: the step 'DeleteFiles@1' does not have a conversion path yet"
+      run: |
+        echo "Error: the step 'DeleteFiles@1' does not have a conversion path yet"
+        #task: DeleteFiles@1
+        #inputs:
+        #  sourcefolder: ${{ env. parameters.tempPath  }}
+        #  contents: '**/*'
+        #  removedotfiles: true
+    - name: 'Publish Artifact: drop'
+      uses: actions/upload-artifact@v2
+      with:
+        path: ${{ env. parameters.artifactsPath  }}
+        name: drop
+                    

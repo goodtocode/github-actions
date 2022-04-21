@@ -1,0 +1,22 @@
+env:
+  artifactsPath: .
+  srcPath: .
+  srcProject: '*.csproj'
+  scriptsPath: ./pipelines/scripts
+jobs:
+  build:
+    steps:
+    - uses: actions/checkout@v2
+    - name: use .net 6.x
+      uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: 6.x
+    - name: Set-Version.ps1
+      shell: powershell
+    - name: dotnet publish
+      run: dotnet publish ${{ env. parameters.srcPath  }}/**/${{ env. parameters.srcProject  }} --output ${{ env. parameters.artifactsPath  }}
+    - name: 'Publish Artifact: drop'
+      uses: actions/upload-artifact@v2
+      with:
+        path: ${{ env. parameters.artifactsPath  }}
+        name: drop

@@ -1,0 +1,30 @@
+#Note: the 'AZURE_SP' secret is required to be added into GitHub Secrets. See this blog post for details: https://samlearnsazure.blog/2019/12/13/github-actions/
+env:
+  armPath: .
+  subscriptionId: 00000000-0000-0000-0000-000000000000
+  subscriptionName: COMPANY-PRODUCT-001
+  rgName: COMPANY-rg-PRODUCT-001
+  rgLocation: West US 2
+  sqlServerName: sb-PRODUCT-ENVIRONMENT-001
+  sqlUserName: LocalAdmin
+  sqlUserPassword: ''
+  sqlDatabaseName: sb-PRODUCT-ENVIRONMENT-001
+  sqlDatabaseSku: Basic
+jobs:
+  build:
+    steps:
+    - uses: actions/checkout@v2
+    - # "Note: the 'AZURE_SP' secret is required to be added into GitHub Secrets. See this blog post for details: https://samlearnsazure.blog/2019/12/13/github-actions/"
+      name: Azure Login
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_SP }}
+    - name: Validate ${{ env. parameters.sqldbName  }}
+      uses: Azure/cli@v1.0.0
+      with:
+        inlineScript: az deployment group create --resource-group ${{ env. parameters.rgName  }} --template-file ${{ env. parameters.armPath  }}/sqldb-sqldatabase.json --parameters  ${{ env. parameters.armPath  }}/sqldb-sqldatabase.parameters.json -name "${{ env. parameters.sqldbName  }}" -sku "${{ env. parameters.sqlDatabaseSku  }}"
+    - name: Deploy ${{ env. parameters.sqldbName  }}
+      uses: Azure/cli@v1.0.0
+      with:
+        inlineScript: az deployment group create --resource-group ${{ env. parameters.rgName  }} --template-file ${{ env. parameters.armPath  }}/sqldb-sqldatabase.json --parameters  ${{ env. parameters.armPath  }}/sqldb-sqldatabase.parameters.json -name "${{ env. parameters.sqldbName  }}" -sku "${{ env. parameters.sqlDatabaseSku  }}"
+                    

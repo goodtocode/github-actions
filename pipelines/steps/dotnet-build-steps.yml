@@ -1,0 +1,28 @@
+env:
+  artifactsPath: .
+  srcPath: .
+  srcProject: '*.csproj'
+  nugetPathFile: .nuget/NuGet.config
+  buildConfiguration: Release
+  scriptsPath: ./pipelines/scripts
+  versionToReplace: 1.0.0
+jobs:
+  build:
+    steps:
+    - uses: actions/checkout@v2
+    - name: use .net 6.x
+      uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: 6.x
+    - name: Set-Version.ps1
+      shell: powershell
+    - name: dotnet restore
+      run: dotnet restore ${{ env. parameters.srcPath  }}/**/${{ env. parameters.srcProject  }}
+    - name: dotnet build
+      run: dotnet build ${{ env. parameters.srcPath  }}/**/${{ env. parameters.srcProject  }} --configuration ${{ env. parameters.buildConfiguration  }}
+    - name: 'Publish Artifact: drop'
+      uses: actions/upload-artifact@v2
+      with:
+        path: ${{ env. parameters.artifactsPath  }}
+        name: drop
+                    

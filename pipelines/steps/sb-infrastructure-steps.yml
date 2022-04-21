@@ -1,0 +1,27 @@
+#Note: the 'AZURE_SP' secret is required to be added into GitHub Secrets. See this blog post for details: https://samlearnsazure.blog/2019/12/13/github-actions/
+env:
+  armPath: .
+  subscriptionId: 00000000-0000-0000-0000-000000000000
+  subscriptionName: COMPANY-PRODUCT-001
+  rgName: COMPANY-rg-PRODUCT-001
+  rgLocation: West US 2
+  sbName: sb-PRODUCT-ENVIRONMENT-001
+  sbSku: Basic
+jobs:
+  build:
+    steps:
+    - uses: actions/checkout@v2
+    - # "Note: the 'AZURE_SP' secret is required to be added into GitHub Secrets. See this blog post for details: https://samlearnsazure.blog/2019/12/13/github-actions/"
+      name: Azure Login
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_SP }}
+    - name: Validate ${{ env. parameters.sbName  }}
+      uses: Azure/cli@v1.0.0
+      with:
+        inlineScript: az deployment group create --resource-group ${{ env. parameters.rgName  }} --template-file ${{ env. parameters.armPath  }}/sb-servicebus.json --parameters  ${{ env. parameters.armPath  }}/sb-servicebus.parameters.json -name "${{ env. parameters.sbName  }}" -sku "${{ env. parameters.sbSku  }}"
+    - name: Deploy ${{ env. parameters.sbName  }}
+      uses: Azure/cli@v1.0.0
+      with:
+        inlineScript: az deployment group create --resource-group ${{ env. parameters.rgName  }} --template-file ${{ env. parameters.armPath  }}/sb-servicebus.json --parameters  ${{ env. parameters.armPath  }}/sb-servicebus.parameters.json -name "${{ env. parameters.sbName  }}" -sku "${{ env. parameters.sbSku  }}"
+                    

@@ -1,0 +1,27 @@
+env:
+  group: COMPANY-rg-PRODUCT-prod
+  template: common.yml
+  rgEnvironment: Production
+  rgName: rg-PRODUCT-prod-001
+  locationName: West US 2
+  appInsightsName: appi-PRODUCT-prod-001
+  cogName: cog-PRODUCT-prod-001
+  cogsku: S0
+  cogtextName: cogtext-PRODUCT-prod-225
+  cogtextSku: S
+  funcNameFree: func-PRODUCT-free-prod-001
+  funcNamePaid: func-PRODUCT-paid-prod-001
+  funcNamePremium: func-PRODUCT-prem-prod-001
+  kvName: kv-PRODUCT-prod-001
+  logicName: logic-PRODUCT-NAME-prod-001
+  nugetServiceConnection: COMPANY-nuget-prod-001
+  nugetFeeds: select
+  nugetType: external
+  nugetId: 00000000-0000-0000-0000-000000000000
+  storageName: stPRODUCTprod001
+  stblobcnName: stblobcn-PRODUCT-prod-001
+  stblobcnNameLower: $[lower(replace(variables['stblobcnName'], '-', ''))]
+  teamscnName: teamscn-PRODUCT-prod-001
+  teamscnNameLower: $[lower(replace(variables['teamscnName'], '-', ''))]
+  workspaceName: work-PRODUCT-prod-001
+                    

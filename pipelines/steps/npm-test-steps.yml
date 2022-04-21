@@ -1,0 +1,24 @@
+env:
+  artifactsPath: .
+  srcPath: .
+  scriptsPath: ./pipelines/scripts
+jobs:
+  build:
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set-Version.ps1
+      shell: powershell
+    - name: Install Node.js
+      uses: actions/setup-node@v1
+      with:
+        node-version: 17.x
+    - name: npm install
+      run: npm install ${{ env. parameters.srcPath  }}
+    - name: npm run test
+      run: npm run test ${{ env. parameters.srcPath  }}
+    - name: 'Publish Artifact: drop'
+      uses: actions/upload-artifact@v2
+      with:
+        path: ${{ env. parameters.artifactsPath  }}
+        name: drop
+                    
