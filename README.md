@@ -1,5 +1,5 @@
 # GitHub Actions YAML for Azure Deployments
-<sup>github-actions Starter GitHub Actions YAML is a starting point for using GitHub Actions YML files to automate cloud infrastructure, building source, unit-testing source, deploying source and running external integration tests.</sup> <br>
+<sup>This repo is a starting point for using GitHub Actions YAML files to automate cloud infrastructure, building source, unit-testing source, deploying source and running external integration tests.</sup> <br>
 
 This is a simple GitHub Actions YAML for Azure Deployments [GitHub Actions for Azure](https://docs.microsoft.com/en-us/azure/developer/github/github-actions)
 
