@@ -4,15 +4,18 @@ on:
     - '*'
     paths:
     - infrastructure/*
-  pull-request:
+  pull_request:
     branches-ignore:
     - '*'
+
 env:
   template: variables/development.yml
   buildPlatform: Any CPU
   buildConfiguration: Release
+
 jobs:
-  development_Stage_deploy_landing_zone:
+  development_deploy_landing_zone:
+    runs-on: ubuntu-latest
     env:
       template: variables/development.yml
     if: (github.ref != 'refs/heads/main')
@@ -30,9 +33,11 @@ jobs:
         kvName: ${{ env.kvName }}
         stName: ${{ env.stName }}
         workName: ${{ env.workName }}
-  development_Stage_deploy_appcs_infrastructure:
+
+  development_deploy_appcs_infrastructure:
+    runs-on: ubuntu-latest
     needs:
-    - development_Stage_deploy_landing_zone
+    - development_deploy_landing_zone
     env:
       template: variables/development.yml
     if: (github.ref != 'refs/heads/main')
@@ -48,9 +53,11 @@ jobs:
         rgLocation: ${{ env.rgLocation }}
         appcsName: ${{ env.appcsName }}
         appcsSku: ${{ env.appcsSku }}
-  development_Stage_deploy_sb_infrastructure:
+
+  development_deploy_sb_infrastructure:
+    runs-on: ubuntu-latest
     needs:
-    - development_Stage_deploy_appcs_infrastructure
+    - development_deploy_appcs_infrastructure
     env:
       template: variables/development.yml
     if: (github.ref != 'refs/heads/main')
@@ -66,9 +73,11 @@ jobs:
         rgLocation: ${{ env.rgLocation }}
         sbName: ${{ env.sbName }}
         sbSku: ${{ env.sbSku }}
-  development_Stage_deploy_func_infrastructure:
+
+  development_deploy_func_infrastructure:
+    runs-on: ubuntu-latest
     needs:
-    - development_Stage_deploy_appcs_infrastructure
+    - development_deploy_appcs_infrastructure
     env:
       template: variables/development.yml
     if: (github.ref != 'refs/heads/main')
@@ -88,9 +97,11 @@ jobs:
         funcName: ${{ env.funcName }}
         stName: ${{ env.stName }}
         workName: ${{ env.workName }}
-  development_Stage_deploy_webjob_infrastructure:
+
+  development_deploy_webjob_infrastructure:
+    runs-on: ubuntu-latest
     needs:
-    - development_Stage_deploy_appcs_infrastructure
+    - development_deploy_appcs_infrastructure
     env:
       template: variables/development.yml
     if: (github.ref != 'refs/heads/main')
@@ -107,7 +118,9 @@ jobs:
         rgEnvironment: ${{ env.rgEnvironment }}
         planName: ${{ env.planName }}
         webjobName: ${{ env.webjobName }}
-  production_Stage_deploy_landing_zone:
+
+  production_deploy_landing_zone:
+    runs-on: ubuntu-latest
     env:
       template: variables/production.yml
     if: (github.ref == 'refs/heads/main')
@@ -125,9 +138,11 @@ jobs:
         kvName: ${{ env.kvName }}
         stName: ${{ env.stName }}
         workName: ${{ env.workName }}
-  production_Stage_deploy_appcs_infrastructure:
+
+  production_deploy_appcs_infrastructure:
+    runs-on: ubuntu-latest
     needs:
-    - production_Stage_deploy_landing_zone
+    - production_deploy_landing_zone
     env:
       template: variables/production.yml
     if: (github.ref == 'refs/heads/main')
@@ -143,9 +158,11 @@ jobs:
         rgLocation: ${{ env.rgLocation }}
         appcsName: ${{ env.appcsName }}
         appcsSku: ${{ env.appcsSku }}
-  production_Stage_deploy_sb_infrastructure:
+
+  production_deploy_sb_infrastructure:
+    runs-on: ubuntu-latest
     needs:
-    - production_Stage_deploy_appcs_infrastructure
+    - production_deploy_appcs_infrastructure
     env:
       template: variables/production.yml
     if: (github.ref == 'refs/heads/main')
@@ -161,9 +178,11 @@ jobs:
         rgLocation: ${{ env.rgLocation }}
         sbName: ${{ env.sbName }}
         sbSku: ${{ env.sbSku }}
-  production_Stage_deploy_func_infrastructure:
+
+  production_deploy_func_infrastructure:
+    runs-on: ubuntu-latest
     needs:
-    - production_Stage_deploy_appcs_infrastructure
+    - production_deploy_appcs_infrastructure
     env:
       template: variables/production.yml
     if: (github.ref == 'refs/heads/main')
@@ -183,9 +202,11 @@ jobs:
         funcName: ${{ env.funcName }}
         stName: ${{ env.stName }}
         workName: ${{ env.workName }}
-  production_Stage_deploy_webjob_infrastructure:
+
+  production_deploy_webjob_infrastructure:
+    runs-on: ubuntu-latest
     needs:
-    - production_Stage_deploy_appcs_infrastructure
+    - production_deploy_appcs_infrastructure
     env:
       template: variables/production.yml
     if: (github.ref == 'refs/heads/main')
