@@ -12,6 +12,7 @@ env:
   template: variables/development.yml
   buildPlatform: Any CPU
   buildConfiguration: Release
+  infrastructurePath: ../infrastructure
 
 jobs:  
   development_build_src:

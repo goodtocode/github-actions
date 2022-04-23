@@ -12,6 +12,7 @@ env:
   template: variables/development.yml
   buildPlatform: Any CPU
   buildConfiguration: Release
+  infrastructurePath: ../infrastructure
 
 jobs:
   development_deploy_landing_zone:
@@ -24,7 +25,7 @@ jobs:
     - # There is no conversion path for templates in GitHub Actions
       run: |
         #steps/landingzone-infrastructure-steps.yml
-        armPath: infrastructure
+        armPath: ${{ env.infrastructurePath }}
         subscriptionId: ${{ env.subscriptionId }}
         subscriptionName: ${{ env.subscriptionName }}
         rgName: ${{ env.rgName }}
@@ -46,7 +47,7 @@ jobs:
     - # There is no conversion path for templates in GitHub Actions
       run: |
         #steps/appcs-infrastructure-steps.yml
-        armPath: infrastructure
+        armPath: ${{ env.infrastructurePath }}
         subscriptionId: ${{ env.subscriptionId }}
         subscriptionName: ${{ env.subscriptionName }}
         rgName: ${{ env.rgName }}
@@ -66,7 +67,7 @@ jobs:
     - # There is no conversion path for templates in GitHub Actions
       run: |
         #steps/sb-infrastructure-steps.yml
-        armPath: infrastructure
+        armPath: ${{ env.infrastructurePath }}
         subscriptionId: ${{ env.subscriptionId }}
         subscriptionName: ${{ env.subscriptionName }}
         rgName: ${{ env.rgName }}
@@ -86,7 +87,7 @@ jobs:
     - # There is no conversion path for templates in GitHub Actions
       run: |
         #steps/func-infrastructure-steps.yml
-        armPath: infrastructure
+        armPath: ${{ env.infrastructurePath }}
         subscriptionId: ${{ env.subscriptionId }}
         subscriptionName: ${{ env.subscriptionName }}
         rgName: ${{ env.rgName }}
@@ -110,7 +111,7 @@ jobs:
     - # There is no conversion path for templates in GitHub Actions
       run: |
         #steps/webjob-infrastructure-steps.yml
-        armPath: infrastructure
+        armPath: ${{ env.infrastructurePath }}
         subscriptionId: ${{ env.subscriptionId }}
         subscriptionName: ${{ env.subscriptionName }}
         rgName: ${{ env.rgName }}
@@ -129,7 +130,7 @@ jobs:
     - # There is no conversion path for templates in GitHub Actions
       run: |
         #steps/landingzone-infrastructure-steps.yml
-        armPath: infrastructure
+        armPath: ${{ env.infrastructurePath }}
         subscriptionId: ${{ env.subscriptionId }}
         subscriptionName: ${{ env.subscriptionName }}
         rgName: ${{ env.rgName }}
@@ -151,7 +152,7 @@ jobs:
     - # There is no conversion path for templates in GitHub Actions
       run: |
         #steps/appcs-infrastructure-steps.yml
-        armPath: infrastructure
+        armPath: ${{ env.infrastructurePath }}
         subscriptionId: ${{ env.subscriptionId }}
         subscriptionName: ${{ env.subscriptionName }}
         rgName: ${{ env.rgName }}
@@ -171,7 +172,7 @@ jobs:
     - # There is no conversion path for templates in GitHub Actions
       run: |
         #steps/sb-infrastructure-steps.yml
-        armPath: infrastructure
+        armPath: ${{ env.infrastructurePath }}
         subscriptionId: ${{ env.subscriptionId }}
         subscriptionName: ${{ env.subscriptionName }}
         rgName: ${{ env.rgName }}
@@ -191,7 +192,7 @@ jobs:
     - # There is no conversion path for templates in GitHub Actions
       run: |
         #steps/func-infrastructure-steps.yml
-        armPath: infrastructure
+        armPath: ${{ env.infrastructurePath }}
         subscriptionId: ${{ env.subscriptionId }}
         subscriptionName: ${{ env.subscriptionName }}
         rgName: ${{ env.rgName }}
@@ -215,7 +216,7 @@ jobs:
     - # There is no conversion path for templates in GitHub Actions
       run: |
         #steps/webjob-infrastructure-steps.yml
-        armPath: infrastructure
+        armPath: ${{ env.infrastructurePath }}
         subscriptionId: ${{ env.subscriptionId }}
         subscriptionName: ${{ env.subscriptionName }}
         rgName: ${{ env.rgName }}
