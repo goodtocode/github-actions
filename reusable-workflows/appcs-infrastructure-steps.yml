@@ -1,12 +1,37 @@
-#Note: the 'AZURE_SP' secret is required to be added into GitHub Secrets. See this blog post for details: https://samlearnsazure.blog/2019/12/13/github-actions/
-env:
-  armPath: .
-  subscriptionId: 00000000-0000-0000-0000-000000000000
-  subscriptionName: COMPANY-PRODUCT-001
-  rgName: COMPANY-rg-PRODUCT-001
-  rgLocation: West US 2
-  appcsName: appcs-PRODUCT-ENVIRONMENT-001
-  appcsSku: free
+name: appcs-infrastructure-steps.yml
+
+on:
+  workflow_call:
+    inputs:
+      armPath:
+        description: 'Path to ARM *.json files - Example: ./infrastructure'
+        required: true
+        type: string
+      subscriptionId:
+        description: 'Azure subscription id - Example: 00000000-0000-0000-0000-000000000000'
+        required: true
+        type: string
+      rgName:
+        description: 'Name if Azure resource group - Example: COMPANY-rg-PRODUCT-001'
+        required: true
+        type: string
+      rgLocation:
+        description: 'Azure Region of the resource group - Example: westus2'
+        required: true
+        type: string
+      appcsName:
+        description: 'Name of the appcs resource - Example: appcs-PRODUCT-ENVIRONMENT-001'
+        required: true
+        type: string
+      appcsSku:
+        description: 'Sku of the appcs resource - Example: free'
+        required: true
+        type: string
+
+    secrets:
+      token:
+        required: true
+
 jobs:
   build:
     steps:
