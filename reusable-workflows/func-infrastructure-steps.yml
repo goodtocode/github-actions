@@ -45,6 +45,15 @@ on:
         description: 'Name of the work- resource this func- resource depends - Example: work-PRODUCT-ENVIRONMENT-001'
         required: true
         type: string
+      azureCredentials:
+        description: 'Azure AD Service Principle (App Registration) to use for deployment - Default: secrets.AZURE_CREDENTIALS'
+        required: false
+        type: string
+        default: ${{ secrets.AZURE_CREDENTIALS  }}
+
+    secrets:
+      token:
+        required: true
 
 jobs:
   build:
@@ -53,13 +62,9 @@ jobs:
     - name: Azure Login
       uses: azure/login@v1
       with:
-        creds: ${{ secrets.AZURE_SP }}
-    - name: Validate ${{ github.event.inputs.funcName  }}
+        creds: ${{ github.event.inputs.azureCredentials }}
+    - name: Deploy ${{ github.event.inputs.funcName }}
       uses: Azure/cli@v1.0.0
       with:
-        inlineScript: az deployment group create --resource-group ${{ github.event.inputs.rgName  }} --template-file ${{ github.event.inputs.armPath  }}/func-functionsapp.json --parameters  ${{ github.event.inputs.armPath  }}/func-functionsapp.parameters.json -name "${{ github.event.inputs.funcName  }}" -funcVersion "${{ github.event.inputs.funcVersion  }}" -workName "${{ github.event.inputs.workName  }}" -stName "${{ github.event.inputs.stName  }}" -appiKey "${{ github.event.inputs.appiKey  }}" -appiConnection "${{ github.event.inputs.appiConnection  }}" -funcRuntime "dotnet-isolated" -rgEnvironment "${{ github.event.inputs.rgEnvironment  }}"
-    - name: Deploy ${{ github.event.inputs.funcName  }}
-      uses: Azure/cli@v1.0.0
-      with:
-        inlineScript: az deployment group create --resource-group ${{ github.event.inputs.rgName  }} --template-file ${{ github.event.inputs.armPath  }}/func-functionsapp.json --parameters  ${{ github.event.inputs.armPath  }}/func-functionsapp.parameters.json -name "${{ github.event.inputs.funcName  }}" -funcVersion "${{ github.event.inputs.funcVersion  }}" -workName "${{ github.event.inputs.workName  }}" -stName "${{ github.event.inputs.stName  }}" -appiKey "${{ github.event.inputs.appiKey  }}" -appiConnection "${{ github.event.inputs.appiConnection  }}" -funcRuntime "dotnet-isolated" -rgEnvironment "${{ github.event.inputs.rgEnvironment  }}"
+        inlineScript: az deployment group create --resource-group ${{ github.event.inputs.rgName }} --template-file ${{ github.event.inputs.armPath }}/func-functionsapp.json --parameters  ${{ github.event.inputs.armPath }}/func-functionsapp.parameters.json -name "${{ github.event.inputs.funcName }}" -funcVersion "${{ github.event.inputs.funcVersion }}" -workName "${{ github.event.inputs.workName }}" -stName "${{ github.event.inputs.stName }}" -appiKey "${{ github.event.inputs.appiKey }}" -appiConnection "${{ github.event.inputs.appiConnection }}" -funcRuntime "dotnet-isolated" -rgEnvironment "${{ github.event.inputs.rgEnvironment }}"
                     

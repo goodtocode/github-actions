@@ -29,6 +29,11 @@ on:
         description: 'Name of the st- resource to deploy as destination - Example: stPRODUCTENVIRONMENT001'
         required: true
         type: string
+      azureCredentials:
+        description: 'Azure AD Service Principle (App Registration) to use for deployment - Default: secrets.AZURE_CREDENTIALS'
+        required: false
+        type: string
+        default: ${{ secrets.AZURE_CREDENTIALS  }}
 
     secrets:
       token:
@@ -38,22 +43,21 @@ jobs:
   build:
     steps:
     - uses: actions/checkout@v2
-    - # "Note: the 'AZURE_SP' secret is required to be added into GitHub Secrets. See this blog post for details: https://samlearnsazure.blog/2019/12/13/github-actions/"
-      name: Azure Login
+    - name: Azure Login
       uses: azure/login@v1
       with:
-        creds: ${{ secrets.AZURE_SP }}
+        creds: ${{ github.event.inputs.azureCredentials }}
     - # "Error: the step 'AzureFileCopy@4' does not have a conversion path yet"
-      name: copy files to ${{ github.event.inputs.destinationContainer  }}
+      name: copy files to ${{ github.event.inputs.destinationContainer }}
       run: |
         echo "Error: the step 'AzureFileCopy@4' does not have a conversion path yet"
         #task: AzureFileCopy@4
-        #displayName: copy files to ${{ github.event.inputs.destinationContainer  }}
+        #displayName: copy files to ${{ github.event.inputs.destinationContainer }}
         #inputs:
-        #  sourcepath: ${{ github.event.inputs.sourcePath  }}/${{ github.event.inputs.sourceFiles  }}
-        #  azuresubscription: ${{ github.event.inputs.subscriptionId  }}
+        #  sourcepath: ${{ github.event.inputs.sourcePath }}/${{ github.event.inputs.sourceFiles }}
+        #  azuresubscription: ${{ github.event.inputs.subscriptionId }}
         #  destination: azureBlob
-        #  storage: ${{ github.event.inputs.stName  }}
-        #  destinationContainer: ${{ github.event.inputs.destinationContainer  }}
-        #  additionalargumentsforblobcopy: ${{ github.event.inputs.arguments  }}
+        #  storage: ${{ github.event.inputs.stName }}
+        #  destinationContainer: ${{ github.event.inputs.destinationContainer }}
+        #  additionalargumentsforblobcopy: ${{ github.event.inputs.arguments }}
                     

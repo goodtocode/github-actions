@@ -17,7 +17,12 @@ on:
         description: 'Name of the func- resource to deploy - Example: func-PRODUCT-ENVIRONMENT-001'
         required: true
         type: string
-  
+      azureCredentials:
+        description: 'Azure AD Service Principle (App Registration) to use for deployment - Default: secrets.AZURE_CREDENTIALS'
+        required: false
+        type: string
+        default: ${{ secrets.AZURE_CREDENTIALS  }}
+
     secrets:
       token:
         required: true
@@ -29,14 +34,14 @@ jobs:
     - name: Azure Login
       uses: azure/login@v1
       with:
-        creds: ${{ secrets.AZURE_SP }}
+        creds: ${{ github.event.inputs.azureCredentials }}
     - uses: actions/download-artifact@v2
       with:
         name: drop
-        path: ${{ github.event.inputs.artifactsPath  }}
-    - name: Deploying ${{ github.event.inputs.funcName  }}
+        path: ${{ github.event.inputs.artifactsPath }}
+    - name: Deploying ${{ github.event.inputs.funcName }}
       uses: Azure/webapps-deploy@v2
       with:
-        app-name: ${{ github.event.inputs.funcName  }}
-        package: ${{ github.event.inputs.artifactsPath  }}/**/${{ github.event.inputs.archiveFile  }}
+        app-name: ${{ github.event.inputs.funcName }}
+        package: ${{ github.event.inputs.artifactsPath }}/**/${{ github.event.inputs.archiveFile }}
                     

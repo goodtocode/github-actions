@@ -58,16 +58,16 @@ jobs:
   build:
     steps:
     - uses: actions/checkout@v2
-    - name: use .net ${{ github.event.inputs.dotnetVersion  }}
+    - name: use .net ${{ github.event.inputs.dotnetVersion }}
       uses: actions/setup-dotnet@v1
       with:
-        dotnet-version: ${{ github.event.inputs.dotnetVersion  }}
+        dotnet-version: ${{ github.event.inputs.dotnetVersion }}
     - name: dotnet test
-      run: dotnet test ${{ github.event.inputs.srcPath  }}/**/${{ github.event.inputs.srcProject  }}
+      run: dotnet test ${{ github.event.inputs.srcPath }}/**/${{ github.event.inputs.srcProject }}
       env:
-        ${{ github.event.inputs.appcsEnvironmentVariable  }}: ${{ github.event.inputs.appcsConnection  }}
-        ${{ github.event.inputs.stEnvironmentVariable  }}: ${{ github.event.inputs.stConnection  }}
-        ASPNETCORE_ENVIRONMENT: ${{ github.event.inputs.rgEnvironment  }}
-        DOTNET_ENVIRONMENT: ${{ github.event.inputs.rgEnvironment  }}
-        AZURE_FUNCTIONS_ENVIRONMENT: ${{ github.event.inputs.rgEnvironment  }}
+        ${{ github.event.inputs.appcsEnvironmentVariable }}: ${{ github.event.inputs.appcsConnection }}
+        ${{ github.event.inputs.stEnvironmentVariable }}: ${{ github.event.inputs.stConnection }}
+        ASPNETCORE_ENVIRONMENT: ${{ github.event.inputs.rgEnvironment }}
+        DOTNET_ENVIRONMENT: ${{ github.event.inputs.rgEnvironment }}
+        AZURE_FUNCTIONS_ENVIRONMENT: ${{ github.event.inputs.rgEnvironment }}
                     

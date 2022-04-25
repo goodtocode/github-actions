@@ -33,18 +33,18 @@ jobs:
   build:
     steps:
     - uses: actions/checkout@v2
-    - name: use .net ${{ github.event.inputs.dotnetVersion  }}
+    - name: use .net ${{ github.event.inputs.dotnetVersion }}
       uses: actions/setup-dotnet@v1
       with:
-        dotnet-version: ${{ github.event.inputs.dotnetVersion  }}
+        dotnet-version: ${{ github.event.inputs.dotnetVersion }}
     - name: Set-Version.ps1
       shell: powershell
-      run: ${{ github.event.inputs.scriptsPath  }}/Set-Version.ps1 --Path ${{ github.event.inputs.srcPath  }} --VersionToReplace ${{ github.event.inputs.srcVersionToReplace  }}
+      run: ${{ github.event.inputs.scriptsPath }}/Set-Version.ps1 --Path ${{ github.event.inputs.srcPath }} --VersionToReplace ${{ github.event.inputs.srcVersionToReplace }}
     - name: dotnet pack
-      run: dotnet pack ${{ github.event.inputs.srcPath  }}/**/${{ github.event.inputs.srcProject  }} --output ${{ github.event.inputs.artifactsPath }}
+      run: dotnet pack ${{ github.event.inputs.srcPath }}/**/${{ github.event.inputs.srcProject }} --output ${{ github.event.inputs.artifactsPath }}
     - name: 'Publish Artifact: drop'
       uses: actions/upload-artifact@v2
       with:
-        path: ${{ github.event.inputs.artifactsPath  }}
+        path: ${{ github.event.inputs.artifactsPath }}
         name: drop
                     

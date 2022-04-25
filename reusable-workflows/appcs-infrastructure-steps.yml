@@ -27,6 +27,11 @@ on:
         options:
           - 'free'
           - 'standard'
+      azureCredentials:
+        description: 'Azure AD Service Principle (App Registration) to use for deployment - Default: secrets.AZURE_CREDENTIALS'
+        required: false
+        type: string
+        default: ${{ secrets.AZURE_CREDENTIALS  }}
 
     secrets:
       token:
@@ -36,17 +41,12 @@ jobs:
   build:
     steps:
     - uses: actions/checkout@v2
-    - # "Note: the 'AZURE_SP' secret is required to be added into GitHub Secrets. See this blog post for details: https://samlearnsazure.blog/2019/12/13/github-actions/"
-      name: Azure Login
+    - name: Azure Login
       uses: azure/login@v1
       with:
-        creds: ${{ secrets.AZURE_SP }}
-    - name: Validate ${{ github.event.inputs.appcsName  }}
+        creds: ${{ github.event.inputs.azureCredentials }}
+    - name: Deploy ${{ github.event.inputs.appcsName }}
       uses: Azure/cli@v1.0.0
       with:
-        inlineScript: az deployment group create --resource-group ${{ github.event.inputs.rgName  }} --template-file ${{ github.event.inputs.armPath  }}/appcs-appconfigurationstore.json --parameters  ${{ github.event.inputs.armPath  }}/appcs-appconfigurationstore.parameters.json -name "${{ github.event.inputs.appcsName  }}" -sku "${{ github.event.inputs.appcsSku  }}"
-    - name: Deploy ${{ github.event.inputs.appcsName  }}
-      uses: Azure/cli@v1.0.0
-      with:
-        inlineScript: az deployment group create --resource-group ${{ github.event.inputs.rgName  }} --template-file ${{ github.event.inputs.armPath  }}/appcs-appconfigurationstore.json --parameters  ${{ github.event.inputs.armPath  }}/appcs-appconfigurationstore.parameters.json -name "${{ github.event.inputs.appcsName  }}" -sku "${{ github.event.inputs.appcsSku  }}"
+        inlineScript: az deployment group create --resource-group ${{ github.event.inputs.rgName }} --template-file ${{ github.event.inputs.armPath }}/appcs-appconfigurationstore.json --parameters  ${{ github.event.inputs.armPath }}/appcs-appconfigurationstore.parameters.json -name "${{ github.event.inputs.appcsName }}" -sku "${{ github.event.inputs.appcsSku }}"
                     
