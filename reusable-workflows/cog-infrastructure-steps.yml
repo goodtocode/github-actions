@@ -1,4 +1,4 @@
-name: sb-infrastructure-steps.yml
+name: cog-infrastructure-steps.yml
 
 on:
   workflow_call:
@@ -15,19 +15,17 @@ on:
         description: 'Azure Region of the resource group - Example: westus2'
         required: true
         type: string
-      sbName:
-        description: 'Name of the sb- resource - Example: sb-PRODUCT-ENVIRONMENT-001'
+      cogName:
+        description: 'Name of the cog- resource - Example: cog-PRODUCT-ENVIRONMENT-001'
         required: true
         type: string
-      sbSku:
-        description: 'Sku of the sb- resource - Example: Basic'
+      cogSku:      
+        description: 'Sku of the cog- resource - Example: S0'
         required: false
         type: choice
-        default: 'Basic'
+        default: 'S0'
         options:
-          - 'Basic'
-          - 'Standard'
-          - 'Premium'
+          - 'S0'
       azureCredentials:
         description: 'Azure AD Service Principle (App Registration) to use for deployment - Default: secrets.AZURE_CREDENTIALS'
         required: false
@@ -46,8 +44,8 @@ jobs:
       uses: azure/login@v1
       with:
         creds: ${{ github.event.inputs.azureCredentials }}
-    - name: Deploy ${{ github.event.inputs.sbName }}
+    - name: Deploy ${{ github.event.inputs.cogtextName }}
       uses: Azure/cli@v1.0.0
       with:
-        inlineScript: az deployment group create --resource-group ${{ github.event.inputs.rgName }} --template-file ${{ github.event.inputs.armPath }}/sb-servicebus.json --parameters  ${{ github.event.inputs.armPath }}/sb-servicebus.parameters.json -name "${{ github.event.inputs.sbName }}" -sku "${{ github.event.inputs.sbSku }}"
+        inlineScript: az deployment group create --resource-group ${{ github.event.inputs.rgName }} --template-file ${{ github.event.inputs.armPath }}/cogtext-textanalytics.json --parameters  ${{ github.event.inputs.armPath }}/cogtext-textanalytics.parameters.json -name "${{ github.event.inputs.cogtextName }}" -sku "${{ github.event.inputs.cogtextSku }}"
                     

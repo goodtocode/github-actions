@@ -10,7 +10,7 @@
 param
 (
 	[Parameter(Mandatory=$true,ValueFromPipelineByPropertyName=$true)]
-    [string] $Path=$(throw '-Path is a required parameter. i.e. $(Build.SourcesDirectory)'),
+    [string] $Path=$(throw '-Path is a required parameter. i.e. /src'),
 	[Version] $VersionToReplace='1.0.0',
 	[String] $Major='-1',
 	[String] $Minor='-1',

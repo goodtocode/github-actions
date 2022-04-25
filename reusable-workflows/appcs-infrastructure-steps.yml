@@ -7,12 +7,8 @@ on:
         description: 'Path to ARM *.json files - Example: ./infrastructure'
         required: true
         type: string
-      subscriptionId:
-        description: 'Azure subscription id - Example: 00000000-0000-0000-0000-000000000000'
-        required: true
-        type: string
       rgName:
-        description: 'Name if Azure resource group - Example: COMPANY-rg-PRODUCT-001'
+        description: 'Name of rg- Azure Resource Group - Example: COMPANY-rg-PRODUCT-001'
         required: true
         type: string
       rgLocation:
@@ -20,13 +16,22 @@ on:
         required: true
         type: string
       appcsName:
-        description: 'Name of the appcs resource - Example: appcs-PRODUCT-ENVIRONMENT-001'
+        description: 'Name of the appcs- resource - Example: appcs-PRODUCT-ENVIRONMENT-001'
         required: true
         type: string
       appcsSku:
-        description: 'Sku of the appcs resource - Example: free'
-        required: true
+        description: 'Sku of the appcs- resource - Example: free'
+        required: false
+        type: choice
+        default: 'free'
+        options:
+          - 'free'
+          - 'standard'
+      azureCredentials:
+        description: 'Azure AD Service Principle (App Registration) to use for deployment - Default: secrets.AZURE_CREDENTIALS'
+        required: false
         type: string
+        default: ${{ secrets.AZURE_CREDENTIALS  }}
 
     secrets:
       token:
@@ -36,17 +41,12 @@ jobs:
   build:
     steps:
     - uses: actions/checkout@v2
-    - # "Note: the 'AZURE_SP' secret is required to be added into GitHub Secrets. See this blog post for details: https://samlearnsazure.blog/2019/12/13/github-actions/"
-      name: Azure Login
+    - name: Azure Login
       uses: azure/login@v1
       with:
-        creds: ${{ secrets.AZURE_SP }}
-    - name: Validate ${{ env. parameters.appcsName  }}
+        creds: ${{ github.event.inputs.azureCredentials }}
+    - name: Deploy ${{ github.event.inputs.appcsName }}
       uses: Azure/cli@v1.0.0
       with:
-        inlineScript: az deployment group create --resource-group ${{ env. parameters.rgName  }} --template-file ${{ env. parameters.armPath  }}/appcs-appconfigurationstore.json --parameters  ${{ env. parameters.armPath  }}/appcs-appconfigurationstore.parameters.json -name "${{ env. parameters.appcsName  }}" -sku "${{ env. parameters.appcsSku  }}"
-    - name: Deploy ${{ env. parameters.appcsName  }}
-      uses: Azure/cli@v1.0.0
-      with:
-        inlineScript: az deployment group create --resource-group ${{ env. parameters.rgName  }} --template-file ${{ env. parameters.armPath  }}/appcs-appconfigurationstore.json --parameters  ${{ env. parameters.armPath  }}/appcs-appconfigurationstore.parameters.json -name "${{ env. parameters.appcsName  }}" -sku "${{ env. parameters.appcsSku  }}"
+        inlineScript: az deployment group create --resource-group ${{ github.event.inputs.rgName }} --template-file ${{ github.event.inputs.armPath }}/appcs-appconfigurationstore.json --parameters  ${{ github.event.inputs.armPath }}/appcs-appconfigurationstore.parameters.json -name "${{ github.event.inputs.appcsName }}" -sku "${{ github.event.inputs.appcsSku }}"
                     

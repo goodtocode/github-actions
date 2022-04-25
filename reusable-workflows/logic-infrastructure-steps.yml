@@ -1,27 +1,40 @@
-#Note: the 'AZURE_SP' secret is required to be added into GitHub Secrets. See this blog post for details: https://samlearnsazure.blog/2019/12/13/github-actions/
-env:
-  subscriptionId: 00000000-0000-0000-0000-000000000000
-  subscriptionName: COMPANY-PRODUCT-001
-  rgName: COMPANY-rg-PRODUCT-001
-  rgLocation: West US 2
-  logicPath: .
-  logicName: logic-PRODUCT-ENVIRONMENT-001
-  logicParameters: logic-PRODUCT-ENVIRONMENT-001
+name: logic-infrastructure-steps.yml
+
+on:
+  workflow_call:
+    inputs:
+      armPath:
+        description: 'Path to ARM *.json files - Example: ./infrastructure'
+        required: true
+        type: string
+      rgName:
+        description: 'Name of rg- Azure Resource Group - Example: COMPANY-rg-PRODUCT-001'
+        required: true
+        type: string
+      rgLocation:
+        description: 'Azure Region of the resource group - Example: westus2'
+        required: true
+        type: string
+      logicName:
+        description: 'Name of the logic- resource - Example: logic-WORKFLOW-ENVIRONMENT-001'
+        required: true
+        type: string
+      azureCredentials:
+        description: 'Azure AD Service Principle (App Registration) to use for deployment - Default: secrets.AZURE_CREDENTIALS'
+        required: false
+        type: string
+        default: ${{ secrets.AZURE_CREDENTIALS  }}
+
 jobs:
   build:
     steps:
     - uses: actions/checkout@v2
-    - # "Note: the 'AZURE_SP' secret is required to be added into GitHub Secrets. See this blog post for details: https://samlearnsazure.blog/2019/12/13/github-actions/"
-      name: Azure Login
+    - name: Azure Login
       uses: azure/login@v1
       with:
-        creds: ${{ secrets.AZURE_SP }}
-    - name: Validate ${{ env. parameters.logicName  }}
+        creds: ${{ github.event.inputs.azureCredentials }}
+    - name: Deploy ${{ github.event.inputs.logicName }}
       uses: Azure/cli@v1.0.0
       with:
-        inlineScript: az deployment group create --resource-group ${{ env. parameters.rgName  }} --template-file ${{ env. parameters.logicPath  }}/LogicApp.json --parameters  ${{ env. parameters.logicPath  }}/LogicApp.parameters.json ${{ env. parameters.logicParameters  }}
-    - name: Deploy ${{ env. parameters.logicName  }}
-      uses: Azure/cli@v1.0.0
-      with:
-        inlineScript: az deployment group create --resource-group ${{ env. parameters.rgName  }} --template-file ${{ env. parameters.logicPath  }}/LogicApp.json --parameters  ${{ env. parameters.logicPath  }}/LogicApp.parameters.json ${{ env. parameters.logicParameters  }}
+        inlineScript: az deployment group create --resource-group ${{ github.event.inputs.rgName }} --template-file ${{ github.event.inputs.armPath }}/LogicApp.json --parameters  ${{ github.event.inputs.armPath }}/LogicApp.parameters.json ${{ github.event.inputs.logicParameters }}
                     
