@@ -29,7 +29,7 @@ on:
         type: string
         default: 'Release'
       dotnetVersion:
-        description: 'Mask to .NET source project file name - Default: *.csproj'
+        description: 'Mask to .NET version - Default: 6.x'
         required: false
         type: string
         default: '6.x'
