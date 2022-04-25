@@ -4,7 +4,7 @@ env:
   archiveFile: '*.zip'
   webName: web-PRODUCT-ENVIRONMENT-001
   subscriptionId: 00000000-0000-0000-0000-000000000000
-  subscriptionName: COMPANY-PRODUCT-001
+  
 jobs:
   build:
     steps:
@@ -17,10 +17,10 @@ jobs:
     - uses: actions/download-artifact@v2
       with:
         name: drop
-        path: ${{ env. parameters.artifactsPath  }}
-    - name: Deploying ${{ env. parameters.webName  }}
+        path: ${{ github.event.inputs.artifactsPath  }}
+    - name: Deploying ${{ github.event.inputs.webName  }}
       uses: Azure/webapps-deploy@v2
       with:
-        app-name: ${{ env. parameters.webName  }}
-        package: ${{ env. parameters.artifactsPath  }}/**/${{ env. parameters.archiveFile  }}
+        app-name: ${{ github.event.inputs.webName  }}
+        package: ${{ github.event.inputs.artifactsPath  }}/**/${{ github.event.inputs.archiveFile  }}
                     

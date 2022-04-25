@@ -2,7 +2,7 @@
 env:
   armPath: .
   subscriptionId: 00000000-0000-0000-0000-000000000000
-  subscriptionName: COMPANY-PRODUCT-001
+  
   rgName: COMPANY-rg-PRODUCT-001
   rgLocation: West US 2
   sqlServerName: sb-PRODUCT-ENVIRONMENT-001
@@ -19,12 +19,12 @@ jobs:
       uses: azure/login@v1
       with:
         creds: ${{ secrets.AZURE_SP }}
-    - name: Validate ${{ env. parameters.sqldbName  }}
+    - name: Validate ${{ github.event.inputs.sqldbName  }}
       uses: Azure/cli@v1.0.0
       with:
-        inlineScript: az deployment group create --resource-group ${{ env. parameters.rgName  }} --template-file ${{ env. parameters.armPath  }}/sqldb-sqldatabase.json --parameters  ${{ env. parameters.armPath  }}/sqldb-sqldatabase.parameters.json -name "${{ env. parameters.sqldbName  }}" -sku "${{ env. parameters.sqlDatabaseSku  }}"
-    - name: Deploy ${{ env. parameters.sqldbName  }}
+        inlineScript: az deployment group create --resource-group ${{ github.event.inputs.rgName  }} --template-file ${{ github.event.inputs.armPath  }}/sqldb-sqldatabase.json --parameters  ${{ github.event.inputs.armPath  }}/sqldb-sqldatabase.parameters.json -name "${{ github.event.inputs.sqldbName  }}" -sku "${{ github.event.inputs.sqlDatabaseSku  }}"
+    - name: Deploy ${{ github.event.inputs.sqldbName  }}
       uses: Azure/cli@v1.0.0
       with:
-        inlineScript: az deployment group create --resource-group ${{ env. parameters.rgName  }} --template-file ${{ env. parameters.armPath  }}/sqldb-sqldatabase.json --parameters  ${{ env. parameters.armPath  }}/sqldb-sqldatabase.parameters.json -name "${{ env. parameters.sqldbName  }}" -sku "${{ env. parameters.sqlDatabaseSku  }}"
+        inlineScript: az deployment group create --resource-group ${{ github.event.inputs.rgName  }} --template-file ${{ github.event.inputs.armPath  }}/sqldb-sqldatabase.json --parameters  ${{ github.event.inputs.armPath  }}/sqldb-sqldatabase.parameters.json -name "${{ github.event.inputs.sqldbName  }}" -sku "${{ github.event.inputs.sqlDatabaseSku  }}"
                     

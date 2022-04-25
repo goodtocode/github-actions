@@ -22,38 +22,37 @@ jobs:
         echo "Error: the step 'DeleteFiles@1' does not have a conversion path yet"
         #task: DeleteFiles@1
         #inputs:
-        #  sourcefolder: ${{ env. parameters.tempPath  }}
+        #  sourcefolder: ${{ github.event.inputs.tempPath  }}
         #  contents: '**/*'
         #  removedotfiles: true
-    - name: use .net 6.x
+    - name: use .net ${{ github.event.inputs.dotnetVersion  }}
       uses: actions/setup-dotnet@v1
       with:
-        dotnet-version: 6.x
+        dotnet-version: ${{ github.event.inputs.dotnetVersion  }}
     - name: dotnet restore
-      run: dotnet restore ${{ env. parameters.srcPath  }}/**/${{ env. parameters.webjobProject  }}
+      run: dotnet restore ${{ github.event.inputs.srcPath  }}/**/${{ github.event.inputs.webjobProject  }}
     - name: dotnet build
-      run: dotnet build ${{ env. parameters.srcPath  }}/**/${{ env. parameters.webjobProject  }} --output ${{ env. parameters.tempPath  }}${{ env. parameters.webjobPath  }}/${{ env. parameters.webjobType  }}/${{ env. parameters.webjobName  }} --configuration ${{ env. parameters.buildConfiguration  }}
+      run: dotnet build ${{ github.event.inputs.srcPath  }}/**/${{ github.event.inputs.webjobProject  }} --output ${{ github.event.inputs.tempPath  }}${{ github.event.inputs.webjobPath  }}/${{ github.event.inputs.webjobType  }}/${{ github.event.inputs.webjobName  }} --configuration ${{ github.event.inputs.buildConfiguration  }}
     - name: create settings.job
       run: |
-        New-Item '${{ env. parameters.tempPath  }}${{ env. parameters.webjobPath  }}/${{ env. parameters.webjobType  }}/${{ env. parameters.webjobName  }}/settings.job'
-        Set-Content '${{ env. parameters.tempPath  }}${{ env. parameters.webjobPath  }}/${{ env. parameters.webjobType  }}/${{ env. parameters.webjobName  }}/settings.job' '{schedule:${{ env. parameters.cronSchedule  }}}'
+        New-Item '${{ github.event.inputs.tempPath  }}${{ github.event.inputs.webjobPath  }}/${{ github.event.inputs.webjobType  }}/${{ github.event.inputs.webjobName  }}/settings.job'
+        Set-Content '${{ github.event.inputs.tempPath  }}${{ github.event.inputs.webjobPath  }}/${{ github.event.inputs.webjobType  }}/${{ github.event.inputs.webjobName  }}/settings.job' '{schedule:${{ github.event.inputs.cronSchedule  }}}'
       shell: powershell
-    - # 'Note: This is a third party action and currently only supports Linux: https://github.com/marketplace/actions/create-zip-file'
-      name: Archive ${{ env. parameters.archiveFile  }}
+    - name: Archive ${{ github.event.inputs.archiveFile  }}
       uses: montudor/action-zip@v0.1.0
       with:
-        args: zip -qq -r ${{ env. parameters.artifactsPath  }}/${{ env. parameters.archiveFile  }} ${{ env. parameters.tempPath  }}
+        args: zip -qq -r ${{ github.event.inputs.artifactsPath  }}/${{ github.event.inputs.archiveFile  }} ${{ github.event.inputs.tempPath  }}
     - # "Error: the step 'DeleteFiles@1' does not have a conversion path yet"
       run: |
         echo "Error: the step 'DeleteFiles@1' does not have a conversion path yet"
         #task: DeleteFiles@1
         #inputs:
-        #  sourcefolder: ${{ env. parameters.tempPath  }}
+        #  sourcefolder: ${{ github.event.inputs.tempPath  }}
         #  contents: '**/*'
         #  removedotfiles: true
     - name: 'Publish Artifact: drop'
       uses: actions/upload-artifact@v2
       with:
-        path: ${{ env. parameters.artifactsPath  }}
+        path: ${{ github.event.inputs.artifactsPath  }}
         name: drop
                     

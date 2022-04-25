@@ -1,7 +1,7 @@
 #Note: the 'AZURE_SP' secret is required to be added into GitHub Secrets. See this blog post for details: https://samlearnsazure.blog/2019/12/13/github-actions/
 env:
   subscriptionId: 00000000-0000-0000-0000-000000000000
-  subscriptionName: COMPANY-PRODUCT-001
+  
   rgName: COMPANY-rg-PRODUCT-001
   rgLocation: West US 2
   logicPath: .
@@ -16,12 +16,12 @@ jobs:
       uses: azure/login@v1
       with:
         creds: ${{ secrets.AZURE_SP }}
-    - name: Validate ${{ env. parameters.logicName  }}
+    - name: Validate ${{ github.event.inputs.logicName  }}
       uses: Azure/cli@v1.0.0
       with:
-        inlineScript: az deployment group create --resource-group ${{ env. parameters.rgName  }} --template-file ${{ env. parameters.logicPath  }}/LogicApp.json --parameters  ${{ env. parameters.logicPath  }}/LogicApp.parameters.json ${{ env. parameters.logicParameters  }}
-    - name: Deploy ${{ env. parameters.logicName  }}
+        inlineScript: az deployment group create --resource-group ${{ github.event.inputs.rgName  }} --template-file ${{ github.event.inputs.logicPath  }}/LogicApp.json --parameters  ${{ github.event.inputs.logicPath  }}/LogicApp.parameters.json ${{ github.event.inputs.logicParameters  }}
+    - name: Deploy ${{ github.event.inputs.logicName  }}
       uses: Azure/cli@v1.0.0
       with:
-        inlineScript: az deployment group create --resource-group ${{ env. parameters.rgName  }} --template-file ${{ env. parameters.logicPath  }}/LogicApp.json --parameters  ${{ env. parameters.logicPath  }}/LogicApp.parameters.json ${{ env. parameters.logicParameters  }}
+        inlineScript: az deployment group create --resource-group ${{ github.event.inputs.rgName  }} --template-file ${{ github.event.inputs.logicPath  }}/LogicApp.json --parameters  ${{ github.event.inputs.logicPath  }}/LogicApp.parameters.json ${{ github.event.inputs.logicParameters  }}
                     

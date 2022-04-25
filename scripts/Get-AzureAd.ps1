@@ -29,9 +29,6 @@ Write-Host "*** Imports ***"
 Import-Module "./System.psm1"
 Install-Module -Name Az -AllowClobber -Scope CurrentUser # All
 Install-Module -Name AzureAD -AllowClobber -Scope CurrentUser
-#Install-Module -Name Az.Accounts -AllowClobber -Scope CurrentUser
-#Install-Module -Name Az.Billing -AllowClobber -Scope CurrentUser
-#Install-Module -Name Az.Resources -AllowClobber -Scope CurrentUser
 
 # ***
 # *** Auth

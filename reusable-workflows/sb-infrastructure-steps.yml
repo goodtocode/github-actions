@@ -2,7 +2,7 @@
 env:
   armPath: .
   subscriptionId: 00000000-0000-0000-0000-000000000000
-  subscriptionName: COMPANY-PRODUCT-001
+  
   rgName: COMPANY-rg-PRODUCT-001
   rgLocation: West US 2
   sbName: sb-PRODUCT-ENVIRONMENT-001
@@ -16,12 +16,12 @@ jobs:
       uses: azure/login@v1
       with:
         creds: ${{ secrets.AZURE_SP }}
-    - name: Validate ${{ env. parameters.sbName  }}
+    - name: Validate ${{ github.event.inputs.sbName  }}
       uses: Azure/cli@v1.0.0
       with:
-        inlineScript: az deployment group create --resource-group ${{ env. parameters.rgName  }} --template-file ${{ env. parameters.armPath  }}/sb-servicebus.json --parameters  ${{ env. parameters.armPath  }}/sb-servicebus.parameters.json -name "${{ env. parameters.sbName  }}" -sku "${{ env. parameters.sbSku  }}"
-    - name: Deploy ${{ env. parameters.sbName  }}
+        inlineScript: az deployment group create --resource-group ${{ github.event.inputs.rgName  }} --template-file ${{ github.event.inputs.armPath  }}/sb-servicebus.json --parameters  ${{ github.event.inputs.armPath  }}/sb-servicebus.parameters.json -name "${{ github.event.inputs.sbName  }}" -sku "${{ github.event.inputs.sbSku  }}"
+    - name: Deploy ${{ github.event.inputs.sbName  }}
       uses: Azure/cli@v1.0.0
       with:
-        inlineScript: az deployment group create --resource-group ${{ env. parameters.rgName  }} --template-file ${{ env. parameters.armPath  }}/sb-servicebus.json --parameters  ${{ env. parameters.armPath  }}/sb-servicebus.parameters.json -name "${{ env. parameters.sbName  }}" -sku "${{ env. parameters.sbSku  }}"
+        inlineScript: az deployment group create --resource-group ${{ github.event.inputs.rgName  }} --template-file ${{ github.event.inputs.armPath  }}/sb-servicebus.json --parameters  ${{ github.event.inputs.armPath  }}/sb-servicebus.parameters.json -name "${{ github.event.inputs.sbName  }}" -sku "${{ github.event.inputs.sbSku  }}"
                     

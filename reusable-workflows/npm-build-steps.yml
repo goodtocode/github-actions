@@ -13,14 +13,15 @@ jobs:
     - uses: actions/checkout@v2
     - name: Set-Version.ps1
       shell: powershell
+      run: ${{ github.event.inputs.scriptsPath  }}/Set-Version.ps1 --Path ${{ github.event.inputs.srcPath  }} --VersionToReplace ${{ github.event.inputs.srcVersionToReplace  }}
     - name: Install Node.js
       uses: actions/setup-node@v1
       with:
         node-version: 17.x
     - name: npm install
-      run: npm install ${{ env. parameters.srcPath  }}
+      run: npm install ${{ github.event.inputs.srcPath  }}
     - name: npm run build
-      run: npm run build ${{ env. parameters.srcPath  }}
+      run: npm run build ${{ github.event.inputs.srcPath  }}
     - # "Error: the step 'DeleteFiles@1' does not have a conversion path yet"
       name: delete tempPath
       run: |
@@ -28,16 +29,15 @@ jobs:
         #task: DeleteFiles@1
         #displayName: delete tempPath
         #inputs:
-        #  sourcefolder: ${{ env. parameters.tempPath  }}
+        #  sourcefolder: ${{ github.event.inputs.tempPath  }}
         #  contents: '**/*'
         #  removedotfiles: true
     - name: copy wwwroot
-      run: Copy '${{ env. parameters.srcPath  }}/wwwroot/**' '${{ env. parameters.tempPath  }}'
-    - # 'Note: This is a third party action and currently only supports Linux: https://github.com/marketplace/actions/create-zip-file'
-      name: Archive ${{ env. parameters.archiveFile  }}
+      run: Copy '${{ github.event.inputs.srcPath  }}/wwwroot/**' '${{ github.event.inputs.tempPath  }}'
+    - name: Archive ${{ github.event.inputs.archiveFile  }}
       uses: montudor/action-zip@v0.1.0
       with:
-        args: zip -qq -r ${{ env. parameters.artifactsPath  }}/${{ env. parameters.archiveFile  }} ${{ env. parameters.tempPath  }}
+        args: zip -qq -r ${{ github.event.inputs.artifactsPath  }}/${{ github.event.inputs.archiveFile  }} ${{ github.event.inputs.tempPath  }}
     - # "Error: the step 'DeleteFiles@1' does not have a conversion path yet"
       name: delete tempPath
       run: |
@@ -45,12 +45,12 @@ jobs:
         #task: DeleteFiles@1
         #displayName: delete tempPath
         #inputs:
-        #  sourcefolder: ${{ env. parameters.tempPath  }}
+        #  sourcefolder: ${{ github.event.inputs.tempPath  }}
         #  contents: '**/*'
         #  removedotfiles: true
     - name: 'Publish Artifact: drop'
       uses: actions/upload-artifact@v2
       with:
-        path: ${{ env. parameters.artifactsPath  }}
+        path: ${{ github.event.inputs.artifactsPath  }}
         name: drop
                     

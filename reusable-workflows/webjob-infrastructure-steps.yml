@@ -2,7 +2,7 @@
 env:
   armPath: .
   subscriptionId: 00000000-0000-0000-0000-000000000000
-  subscriptionName: COMPANY-PRODUCT-001
+  
   rgName: COMPANY-rg-PRODUCT-001
   rgLocation: West US 2
   rgEnvironment: Development
@@ -18,20 +18,20 @@ jobs:
       uses: azure/login@v1
       with:
         creds: ${{ secrets.AZURE_SP }}
-    - name: Validate ${{ env. parameters.planName  }}
+    - name: Validate ${{ github.event.inputs.planName  }}
       uses: Azure/cli@v1.0.0
       with:
-        inlineScript: az deployment group create --resource-group ${{ env. parameters.rgName  }} --template-file ${{ env. parameters.armPath  }}/plan-appplan.json --parameters  ${{ env. parameters.armPath  }}/plan-appplan.parameters.json -name "${{ env. parameters.planName  }}" -sku "${{ env. parameters.planSku  }}"
-    - name: Deploy ${{ env. parameters.planName  }}
+        inlineScript: az deployment group create --resource-group ${{ github.event.inputs.rgName  }} --template-file ${{ github.event.inputs.armPath  }}/plan-appplan.json --parameters  ${{ github.event.inputs.armPath  }}/plan-appplan.parameters.json -name "${{ github.event.inputs.planName  }}" -sku "${{ github.event.inputs.planSku  }}"
+    - name: Deploy ${{ github.event.inputs.planName  }}
       uses: Azure/cli@v1.0.0
       with:
-        inlineScript: az deployment group create --resource-group ${{ env. parameters.rgName  }} --template-file ${{ env. parameters.armPath  }}/plan-appplan.json --parameters  ${{ env. parameters.armPath  }}/plan-appplan.parameters.json -name "${{ env. parameters.planName  }}" -sku "${{ env. parameters.planSku  }}"
-    - name: Validate ${{ env. parameters.webjobName  }}
+        inlineScript: az deployment group create --resource-group ${{ github.event.inputs.rgName  }} --template-file ${{ github.event.inputs.armPath  }}/plan-appplan.json --parameters  ${{ github.event.inputs.armPath  }}/plan-appplan.parameters.json -name "${{ github.event.inputs.planName  }}" -sku "${{ github.event.inputs.planSku  }}"
+    - name: Validate ${{ github.event.inputs.webjobName  }}
       uses: Azure/cli@v1.0.0
       with:
-        inlineScript: az deployment group create --resource-group ${{ env. parameters.rgName  }} --template-file ${{ env. parameters.armPath  }}/web-webapp.json --parameters  ${{ env. parameters.armPath  }}/web-webapp.parameters.json -name "${{ env. parameters.webjobName  }}" -planName "${{ env. parameters.planName  }}"
-    - name: Deploy ${{ env. parameters.webjobName  }}
+        inlineScript: az deployment group create --resource-group ${{ github.event.inputs.rgName  }} --template-file ${{ github.event.inputs.armPath  }}/web-webapp.json --parameters  ${{ github.event.inputs.armPath  }}/web-webapp.parameters.json -name "${{ github.event.inputs.webjobName  }}" -planName "${{ github.event.inputs.planName  }}"
+    - name: Deploy ${{ github.event.inputs.webjobName  }}
       uses: Azure/cli@v1.0.0
       with:
-        inlineScript: az deployment group create --resource-group ${{ env. parameters.rgName  }} --template-file ${{ env. parameters.armPath  }}/web-webapp.json --parameters  ${{ env. parameters.armPath  }}/web-webapp.parameters.json -name "${{ env. parameters.webjobName  }}" -planName "${{ env. parameters.planName  }}"
+        inlineScript: az deployment group create --resource-group ${{ github.event.inputs.rgName  }} --template-file ${{ github.event.inputs.armPath  }}/web-webapp.json --parameters  ${{ github.event.inputs.armPath  }}/web-webapp.parameters.json -name "${{ github.event.inputs.webjobName  }}" -planName "${{ github.event.inputs.planName  }}"
                     
