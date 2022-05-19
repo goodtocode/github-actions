@@ -10,7 +10,7 @@
 param
 (
 	[Parameter(Mandatory=$true,ValueFromPipelineByPropertyName=$true)]
-    [string] $Path=$(throw '-Path is a required parameter. i.e. /src'),
+    [string] $Path=$(throw '-Path is a required parameter. i.e. $(Build.SourcesDirectory)'),
 	[Version] $VersionToReplace='1.0.0',
 	[String] $Major='-1',
 	[String] $Minor='-1',
@@ -47,7 +47,7 @@ If($IsWindows){
 # ***
 # *** Execute
 # ***
-$Major = $Major.Replace('-1', '1')
+$Major = $Major.Replace('-1', $VersionToReplace.ToString().Substring(0,1))
 $Minor = $Minor.Replace('-1', (Get-Date -UFormat '%Y').ToString().Substring(2,2)) # YY
 $Revision = $Revision.Replace('-1', (Get-Date -UFormat '%j').ToString()) # DayOfYear
 $Build = $Build.Replace('-1', (Get-Date -UFormat '%H%M').ToString()) # HrMinSec
