@@ -4,221 +4,194 @@ on:
     - '*'
     paths:
     - src/*
-  pull_request:
+  pull-request:
     branches-ignore:
     - '*'
-
 env:
-  template: variables/development.yml
-  buildPlatform: Any CPU
-  buildConfiguration: Release
-  infrastructurePath: ../infrastructure
-
-jobs:  
-  development_build_src:
-    runs-on: ubuntu-latest
+  appcsEnvironmentVariable: AZURE_APP_CONFIGURATION_CONNECTION
+  appcsConnection: ${{ env.appcsConnection }}
+  template: ../variables/common.yml
+jobs:
+  development_Stage_build_src:
     env:
-      template: variables/development.yml
+      template: ../variables/development.yml
     if: (github.ref != 'refs/heads/main')
     steps:
     - uses: actions/checkout@v2
-    - # There is no conversion path for templates in GitHub Actions
-      run: |
-        #steps/dotnet-build-steps.yml
+    - run: |
+        #../steps/dotnet-build-steps.yml
         artifactsPath: ${{ env.artifactsPath }}
         srcPath: ${{ env.srcPath }}
-  
-  development_test_src:
-    runs-on: ubuntu-latest
+  development_Stage_test_src:
     needs:
-    - development_build_src
+    - development_Stage_build_src
     env:
-      template: variables/development.yml
+      template: ../variables/development.yml
     if: (github.ref != 'refs/heads/main')
     steps:
     - uses: actions/checkout@v2
-    - # There is no conversion path for templates in GitHub Actions
+    - 
       run: |
-        #steps/dotnet-test-steps.yml
-        srcPath: ${{ github.workspace }}/src
+        #../steps/dotnet-test-steps.yml
+        testPath: ${{ github.workspace }}/src
         appcsEnvironmentVariable: ${{ env.appcsEnvironmentVariable }}
         appcsConnection: ${{ env.appcsConnection }}
         rgEnvironment: ${{ env.rgEnvironment }}
-  
-  development_build_func:
-    runs-on: ubuntu-latest
+  development_Stage_build_func:
     needs:
-    - development_test_src
+    - development_Stage_test_src
     env:
-      template: variables/development.yml
+      template: ../variables/development.yml
     if: (github.ref != 'refs/heads/main')
     steps:
     - uses: actions/checkout@v2
-    - # There is no conversion path for templates in GitHub Actions
+    - 
       run: |
-        #steps/func-build-steps.yml
+        #../steps/func-build-steps.yml
         archiveFile: ${{ env.funcArchiveFile }}
         funcPath: ${{ env.funcPath }}
         tempPath: ${{ env.tempPath }}
-  
-  development_deploy_func:
-    runs-on: ubuntu-latest
+  development_Stage_deploy_func:
     needs:
-    - development_build_func
+    - development_Stage_build_func
     env:
-      template: variables/development.yml
+      template: ../variables/development.yml
     if: (github.ref != 'refs/heads/main')
     steps:
     - uses: actions/checkout@v2
-    - # There is no conversion path for templates in GitHub Actions
+    - 
       run: |
-        #steps/func-deploy-steps.yml
+        #../steps/func-deploy-steps.yml
         appSettings: -${{ env.appcsEnvironmentVariable }} ${{ env.appcsConnection }} -${{ env.stEnvironmentVariable }} ${{ env.stConnection }} -APPINSIGHTS_INSTRUMENTATIONKEY ${{ env.appiKey }} -APPLICATIONINSIGHTS_CONNECTION_STRING ${{ env.appiConnection }} -AZURE_FUNCTIONS_ENVIRONMENT ${{ env.rgEnvironment }} -ASPNETCORE_ENVIRONMENT ${{ env.rgEnvironment }} 
         artifactsPath: ${{ env.artifactsPath }}
         archiveFile: ${{ env.funcArchiveFile }}
         funcName: ${{ env.funcName }}
         subscriptionId: ${{ env.subscriptionId }}
-        
-  
-  development_build_webjob:
-    runs-on: ubuntu-latest
+        subscriptionService: ${{ env. parameters.subscriptionService  }}
+  development_Stage_build_webjob:
     needs:
-    - development_test_src
+    - development_Stage_test_src
     env:
-      template: variables/development.yml
+      template: ../variables/development.yml
     if: (github.ref != 'refs/heads/main')
     steps:
     - uses: actions/checkout@v2
-    - # There is no conversion path for templates in GitHub Actions
+    - 
       run: |
-        #steps/webjob-build-steps.yml
+        #../steps/webjob-build-steps.yml
         artifactsPath: ${{ env.artifactsPath }}
         archiveFile: ${{ env.webjobArchiveFile }}
         srcPath: ${{ env.srcPath }}
         webjobProject: ${{ env.webjobProject }}
         webjobName: ${{ env.webjobName }}
         cronSchedule: ${{ env.webjobSchedule }}
-  
-  development_deploy_webjob:
-    runs-on: ubuntu-latest
+  development_Stage_deploy_webjob:
     needs:
-    - development_build_webjob
+    - development_Stage_build_webjob
     env:
-      template: variables/development.yml
+      template: ../variables/development.yml
     if: (github.ref != 'refs/heads/main')
     steps:
     - uses: actions/checkout@v2
-    - # There is no conversion path for templates in GitHub Actions
+    - 
       run: |
-        #steps/web-deploy-steps.yml
+        #../steps/web-deploy-steps.yml
         appSettings: -${{ env.appcsEnvironmentVariable }} ${{ env.appcsConnection }} -${{ env.stEnvironmentVariable }} ${{ env.stConnection }} -AzureWebJobsDashboard ${{ env.stConnection }} -APPINSIGHTS_INSTRUMENTATIONKEY ${{ env.appiKey }} -APPLICATIONINSIGHTS_CONNECTION_STRING ${{ env.appiConnection }} -AZURE_FUNCTIONS_ENVIRONMENT ${{ env.rgEnvironment }} -ASPNETCORE_ENVIRONMENT ${{ env.rgEnvironment }} 
         artifactsPath: ${{ env.artifactsPath }}
         archiveFile: ${{ env.webjobArchiveFile }}
         webName: ${{ env.webjobName }}
         subscriptionId: ${{ env.subscriptionId }}
-        
-  
-  production_build_src:
-    runs-on: ubuntu-latest
+        subscriptionService: ${{ env. parameters.subscriptionService  }}
+  production_Stage_build_src:
     env:
-      template: variables/production.yml
+      template: ../variables/production.yml
     if: (github.ref == 'refs/heads/main')
     steps:
     - uses: actions/checkout@v2
-    - # There is no conversion path for templates in GitHub Actions
+    - 
       run: |
-        #steps/dotnet-build-steps.yml
+        #../steps/dotnet-build-steps.yml
         artifactsPath: ${{ env.artifactsPath }}
         srcPath: ${{ env.srcPath }}
-
-  production_test_src:
-    runs-on: ubuntu-latest
+  production_Stage_test_src:
     needs:
-    - production_build_src
+    - production_Stage_build_src
     env:
-      template: variables/production.yml
+      template: ../variables/production.yml
     if: (github.ref == 'refs/heads/main')
     steps:
     - uses: actions/checkout@v2
-    - # There is no conversion path for templates in GitHub Actions
+    - 
       run: |
-        #steps/dotnet-test-steps.yml
-        srcPath: ${{ github.workspace }}/src
+        #../steps/dotnet-test-steps.yml
+        testPath: ${{ github.workspace }}/src
         appcsEnvironmentVariable: ${{ env.appcsEnvironmentVariable }}
         appcsConnection: ${{ env.appcsConnection }}
         rgEnvironment: ${{ env.rgEnvironment }}
-
-  production_build_func:
-    runs-on: ubuntu-latest
+  production_Stage_build_func:
     needs:
-    - production_test_src
+    - production_Stage_test_src
     env:
-      template: variables/production.yml
+      template: ../variables/production.yml
     if: (github.ref == 'refs/heads/main')
     steps:
     - uses: actions/checkout@v2
-    - # There is no conversion path for templates in GitHub Actions
+    - 
       run: |
-        #steps/func-build-steps.yml
+        #../steps/func-build-steps.yml
         artifactsPath: ${{ env.artifactsPath }}
         archiveFile: ${{ env.funcArchiveFile }}
         funcPath: ${{ env.funcPath }}
         tempPath: ${{ env.tempPath }}
-  
-  production_deploy_func:
-    runs-on: ubuntu-latest
+  production_Stage_deploy_func:
     needs:
-    - production_build_func
+    - production_Stage_build_func
     env:
-      template: variables/production.yml
+      template: ../variables/production.yml
     if: (github.ref == 'refs/heads/main')
     steps:
     - uses: actions/checkout@v2
-    - # There is no conversion path for templates in GitHub Actions
+    - 
       run: |
-        #steps/func-deploy-steps.yml
+        #../steps/func-deploy-steps.yml
         appSettings: -${{ env.appcsEnvironmentVariable }} ${{ env.appcsConnection }} -${{ env.stEnvironmentVariable }} ${{ env.stConnection }} -APPINSIGHTS_INSTRUMENTATIONKEY ${{ env.appiKey }} -APPLICATIONINSIGHTS_CONNECTION_STRING ${{ env.appiConnection }} -AZURE_FUNCTIONS_ENVIRONMENT ${{ env.rgEnvironment }} -ASPNETCORE_ENVIRONMENT ${{ env.rgEnvironment }} 
         artifactsPath: ${{ env.artifactsPath }}
         archiveFile: ${{ env.funcArchiveFile }}
         funcName: ${{ env.funcName }}
         subscriptionId: ${{ env.subscriptionId }}
-        
-  
-  production_build_webjob:
-    runs-on: ubuntu-latest
+        subscriptionService: ${{ env. parameters.subscriptionService  }}
+  production_Stage_build_webjob:
     needs:
-    - production_test_src
+    - production_Stage_test_src
     env:
-      template: variables/production.yml
+      template: ../variables/production.yml
     if: (github.ref == 'refs/heads/main')
     steps:
     - uses: actions/checkout@v2
-    - # There is no conversion path for templates in GitHub Actions
+    - 
       run: |
-        #steps/webjob-build-steps.yml
+        #../steps/webjob-build-steps.yml
         artifactsPath: ${{ env.artifactsPath }}
         archiveFile: ${{ env.webjobArchiveFile }}
         srcPath: ${{ env.srcPath }}
         webjobProject: ${{ env.webjobProject }}
         webjobName: ${{ env.webjobName }}
         cronSchedule: ${{ env.webjobSchedule }}
-  
-  production_deploy_webjob:
-    runs-on: ubuntu-latest
+  production_Stage_deploy_webjob:
     needs:
-    - production_build_webjob
+    - production_Stage_build_webjob
     env:
-      template: variables/production.yml
+      template: ../variables/production.yml
     if: (github.ref == 'refs/heads/main')
     steps:
     - uses: actions/checkout@v2
-    - # There is no conversion path for templates in GitHub Actions
+    - 
       run: |
-        #steps/web-deploy-steps.yml
+        #../steps/web-deploy-steps.yml
         appSettings: -${{ env.appcsEnvironmentVariable }} ${{ env.appcsConnection }} -${{ env.stEnvironmentVariable }} ${{ env.stConnection }} -AzureWebJobsDashboard ${{ env.stConnection }} -APPINSIGHTS_INSTRUMENTATIONKEY ${{ env.appiKey }} -APPLICATIONINSIGHTS_CONNECTION_STRING ${{ env.appiConnection }} -AZURE_FUNCTIONS_ENVIRONMENT ${{ env.rgEnvironment }} -ASPNETCORE_ENVIRONMENT ${{ env.rgEnvironment }} 
         artifactsPath: ${{ env.artifactsPath }}
         archiveFile: ${{ env.webjobArchiveFile }}
         webName: ${{ env.webjobName }}
         subscriptionId: ${{ env.subscriptionId }}
-        
+        subscriptionService: ${{ env. parameters.subscriptionService  }}
                     
