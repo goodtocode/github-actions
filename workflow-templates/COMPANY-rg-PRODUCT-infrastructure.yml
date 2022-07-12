@@ -4,88 +4,56 @@ on:
     - '*'
     paths:
     - .azure/*
-  pull-request:
-    branches-ignore:
-    - '*'
-env:
-  template: ../variables/common.yml
-  appcsConnection: ${{ env.appcsConnection }}
-  appcsKeys: '[ "Shared:Sentinel", "ConnectionStrings:StorageTables" ]'
-  appcsValues: '[ "1", "${{ env.stConnection }}" ]'
-  subscriptionId: ${{ env.subscriptionId }}
-  subscriptionService: AZURE_SERVICE_CONNECTION
-jobs:
-  development_Stage_deploy_landing_zone:
-    env:
-      template: ../variables/development.yml
-    if: (github.ref != 'refs/heads/main')
-    steps:
-    - uses: actions/checkout@v2
-    - run: |
-        #../steps/landingzone-infrastructure-steps.yml
-        armPath: ${{ env.infrastructurePath }}
-        subscriptionId: ${{ env. parameters.subscriptionId  }}
-        subscriptionService: ${{ env. parameters.subscriptionService  }}
-        rgName: ${{ env.rgName }}
-        rgLocation: ${{ env.rgLocation }}
-        appiName: ${{ env.appiName }}
-        kvName: ${{ env.kvName }}
-        stName: ${{ env.stName }}
-        workName: ${{ env.workName }}
-  
-  development_Stage_deploy_appcs_infrastructure:
-    needs:
-    - development_Stage_deploy_landing_zone
-    env:
-      template: ../variables/development.yml
-    if: (github.ref != 'refs/heads/main')
-    steps:
-    - uses: actions/checkout@v2
-    - run: |
-        #../steps/appcs-infrastructure-steps.yml
-        armPath: ${{ env.infrastructurePath }}
-        subscriptionId: ${{ env. parameters.subscriptionId  }}
-        subscriptionService: ${{ env. parameters.subscriptionService  }}
-        rgName: ${{ env.rgName }}
-        rgLocation: ${{ env.rgLocation }}
-        appcsName: ${{ env.appcsName }}
-        appcsSku: ${{ env.appcsSku }}
-  
-  development_Stage_deploy_appcs_settings:
-    needs:
-    - development_Stage_deploy_appcs_infrastructure
-    env:
-      template: ../variables/development.yml
-    if: (github.ref != 'refs/heads/main')
-    steps:
-    - uses: actions/checkout@v2
-    - run: |
-        #../steps/appcs-settings-steps.yml
-        armPath: ${{ env.infrastructurePath }}
-        subscriptionId: ${{ env. parameters.subscriptionId  }}
-        subscriptionService: ${{ env. parameters.subscriptionService  }}
-        rgName: ${{ env.rgName }}
-        rgLocation: ${{ env.rgLocation }}
-        appcsName: ${{ env.appcsName }}
-        appcsKeys: ${{ env. parameters.appcsKeys  }}
-        appcsValues: ${{ env. parameters.appcsValues  }}
+    inputs:
+      environment:
+        description: 'Environment to deploy'
+        required: true
+        default: development
+        type: environment
+      environmentInflix:
+        description: 'environment (short name) for resources'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+        - dev
+        - prod
+      companyInflix:
+        description: 'Company abbreviation'
+        required: true 
+        type: string
+        default: 'gtc'
+      counterInflix:
+        description: 'Counter for resources'
+        required: true 
+        type: string
+        default: '001'
+      productInflix:
+        description: 'Product abbreviation'
+        required: true 
+        type: string
+        default: 'www'
+      rgLocation:
+        description: 'Location for resources'
+        required: true 
+        type: string
+        default: 'westus2'
 
-  production_Stage_deploy_landing_zone:
-    env:
-      template: ../variables/production.yml
-    if: (github.ref == 'refs/heads/main')
-    steps:
-    - uses: actions/checkout@v2
-    - 
-      run: |
-        #../steps/landingzone-infrastructure-steps.yml
-        armPath: ${{ env.infrastructurePath }}
-        subscriptionId: ${{ env. parameters.subscriptionId  }}
-        subscriptionService: ${{ env. parameters.subscriptionService  }}
-        rgName: ${{ env.rgName }}
-        rgLocation: ${{ env.rgLocation }}
-        appiName: ${{ env.appiName }}
-        kvName: ${{ env.kvName }}
-        stName: ${{ env.stName }}
-        workName: ${{ env.workName }}
-                    
+env:
+  azcredentials: ${{ secrets.AZURE_CREDENTIALS }}
+
+jobs:
+  deploy_landing_zone:
+    needs: [az_login]
+    uses: ./.github/workflows/landingzone-infrastructure-steps.yml
+    with:
+      armPath: '${{ github.workspace }}/.azure'
+      armSuffix: 'bicep'
+      rgName: '${{ inputs.companyInflix }}-rg-${{ inputs.productInflix }}-${{ inputs.environmentInflix }}-${{ inputs.coutnerInflix }}'
+      rgLocation: ${{ inputs.rgLocation }}
+      appiName: 'appi-${{ inputs.productInflix }}-${{ inputs.environmentInflix }}-${{ inputs.coutnerInflix }}'
+      kvName: 'kv-${{ inputs.productInflix }}-${{ inputs.environmentInflix }}-${{ inputs.coutnerInflix }}'
+      stName: 'st-${{ inputs.productInflix }}-${{ inputs.environmentInflix }}-${{ inputs.coutnerInflix }}'
+      workName: 'work-${{ inputs.productInflix }}-${{ inputs.environmentInflix }}-${{ inputs.coutnerInflix }}'
+    secrets:
+      azureCredentials: $azcredentials
