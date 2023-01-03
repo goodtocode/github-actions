@@ -1,0 +1,32 @@
+on:
+  push:
+    branches:
+    - '*'
+    paths:
+    - src/**/migrations/*
+  pull-request:
+    branches-ignore:
+    - '*'
+env:
+  sqlUser: ${{ env.SQL_USER_VARIABLE_FROM_AZUREDEVOPS_LIBRARY }}
+  sqlPassword: ${{ env.SQL_PASSWORD_VARIABLE_FROM_AZUREDEVOPS_LIBRARY }}
+  subscriptionService: COMPANY-SUBSCRIPTION-001
+  template: ../variables/common.yml
+jobs:
+  development_Stage_deploy_ef_migration:
+    env:
+      template: ../variables/development.yml
+    steps:
+    - uses: actions/checkout@v2
+      run: |
+        #../steps/ef-deploy-steps.yml
+        artifactsPath: ${{ env.artifactsPath }}
+        buildConfiguration: ${{ env.buildConfiguration }}
+        sqldbName: ${{ env.sqldbName }}
+        sqlName: ${{ env.sqlName }}
+        sqlUser: ${{ env. parameters.sqlUser  }}
+        sqlPassword: ${{ env. parameters.sqlPassword  }}
+        srcPath: ${{ env.srcPath }}
+        srcProject: ${{ env.srcProject }}
+        subscriptionService: ${{ env. parameters.subscriptionService  }}
+                    

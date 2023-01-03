@@ -1,0 +1,361 @@
+on:
+  push:
+    branches:
+    - '*'
+    paths:
+    - src/Core/*
+    - src/Infrastructure/*
+    - src/Specs/*
+    - src/Presentation/Api/*
+  pull-request:
+    branches-ignore:
+    - '*'
+env:
+  appcsEnvironmentVariable: AZURE_APPCS_CONNECTION_STRING_ENV_VAR
+  appcsConnection: ${{ env.appcsConnection }}
+  subscriptionService: AZURE_DEVOPS_SERVICE_CONNECTION_NAME
+  template: ../variables/common.yml
+#  - name: apiSettings
+#    type: object
+#    default: 
+#      - name: 'APPINSIGHTS_INSTRUMENTATIONKEY'
+#        value: '$(appiKey)'
+#        slotSetting: false
+#      - name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
+#        value: '$(appiConnection)'
+#        slotSetting: false        
+#      - name: 'ASPNETCORE_ENVIRONMENT'
+#        value: '$(rgEnvironment)'
+#        slotSetting: false
+#      - name: '$(appcsEnvironmentVariable)'
+#        value: '$(appcsConnection)'
+#        slotSetting: false
+
+jobs:
+  development_Stage_build_src:
+    env:
+      template: ../variables/development.yml
+    if: (github.ref == 'refs/heads/development')
+    steps:
+    - uses: actions/checkout@v2
+    - # There is no conversion path for templates in GitHub Actions
+      run: |
+        #../steps/dotnet-build-steps.yml
+        artifactsPath: ${{ env.artifactsPath }}
+        srcPath: ${{ env.srcPath }}
+  development_Stage_test_unit:
+    needs:
+    - development_Stage_build_src
+    env:
+      template: ../variables/development.yml
+    if: (github.ref == 'refs/heads/development')
+    steps:
+    - uses: actions/checkout@v2
+    - # There is no conversion path for templates in GitHub Actions
+      run: |
+        #../steps/dotnet-test-steps.yml
+        testPath: ${{ env.unitPath }}
+        testProject: ${{ env.unitProject }}
+        restorePath: ${{ env.srcPath }}
+        appcsEnvironmentVariable: ${{ env.appcsEnvironmentVariable }}
+        appcsConnection: ${{ env.appcsConnection }}
+        rgEnvironment: ${{ env.rgEnvironment }}
+  development_Stage_package_api:
+    needs:
+    - development_Stage_test_unit
+    env:
+      template: ../variables/development.yml
+    if: (github.ref == 'refs/heads/development')
+    steps:
+    - uses: actions/checkout@v2
+    - # There is no conversion path for templates in GitHub Actions
+      run: |
+        #../steps/dotnet-publish-steps.yml
+        artifactsPath: ${{ env.artifactspath }}
+        restorePath: ${{ env.srcpath }}
+        scriptsPath: ${{ env.scriptspath }}
+        srcPath: ${{ env.apipath }}
+        srcProject: ${{ env.apiProject }}
+  development_Stage_settings_api:
+    needs:
+    - development_Stage_package_api
+    env:
+      template: ../variables/development.yml
+    if: (github.ref == 'refs/heads/development')
+    steps:
+    - uses: actions/checkout@v2
+    - # There is no conversion path for templates in GitHub Actions
+      run: |
+        #../steps/api-settings-steps.yml
+        subscriptionService: ${{ env. parameters.subscriptionService  }}
+        rgEnvironment: ${{ env.rgEnvironment }}
+        apiName: ${{ env.apiName }}
+        appSettings: ${{ env. parameters.apiSettings  }}
+  development_Stage_deploy_api:
+    needs:
+    - development_Stage_settings_api
+    env:
+      template: ../variables/development.yml
+    if: (github.ref == 'refs/heads/development')
+    steps:
+    - uses: actions/checkout@v2
+    - # There is no conversion path for templates in GitHub Actions
+      run: |
+        #../steps/api-deploy-steps.yml
+        artifactsPath: ${{ env.artifactsPath }}
+        archiveFile: ${{ env.archiveFile }}
+        apiName: ${{ env.apiName }}
+        subscriptionId: ${{ env.subscriptionId }}
+        subscriptionService: ${{ env. parameters.subscriptionService  }}
+  qa_Stage_build_src:
+    env:
+      template: ../variables/qa.yml
+    if: (github.ref == 'refs/heads/main')
+    steps:
+    - uses: actions/checkout@v2
+    - # There is no conversion path for templates in GitHub Actions
+      run: |
+        #../steps/dotnet-build-steps.yml
+        artifactsPath: ${{ env.artifactsPath }}
+        srcPath: ${{ env.srcPath }}
+  qa_Stage_test_unit:
+    needs:
+    - qa_Stage_build_src
+    env:
+      template: ../variables/qa.yml
+    if: (github.ref == 'refs/heads/main')
+    steps:
+    - uses: actions/checkout@v2
+    - # There is no conversion path for templates in GitHub Actions
+      run: |
+        #../steps/dotnet-test-steps.yml
+        testPath: ${{ env.unitPath }}
+        testProject: ${{ env.unitProject }}
+        restorePath: ${{ env.srcPath }}
+        appcsEnvironmentVariable: ${{ env.appcsEnvironmentVariable }}
+        appcsConnection: ${{ env.appcsConnection }}
+        rgEnvironment: ${{ env.rgEnvironment }}
+  qa_Stage_package_api:
+    needs:
+    - qa_Stage_test_unit
+    env:
+      template: ../variables/qa.yml
+    if: (github.ref == 'refs/heads/main')
+    steps:
+    - uses: actions/checkout@v2
+    - # There is no conversion path for templates in GitHub Actions
+      run: |
+        #../steps/dotnet-publish-steps.yml
+        artifactsPath: ${{ env.artifactspath }}
+        restorePath: ${{ env.srcpath }}
+        scriptsPath: ${{ env.scriptspath }}
+        srcPath: ${{ env.apipath }}
+        srcProject: ${{ env.apiProject }}
+  qa_Stage_settings_api:
+    needs:
+    - qa_Stage_package_api
+    env:
+      template: ../variables/qa.yml
+    if: (github.ref == 'refs/heads/main')
+    steps:
+    - uses: actions/checkout@v2
+    - # There is no conversion path for templates in GitHub Actions
+      run: |
+        #../steps/api-settings-steps.yml
+        subscriptionService: ${{ env. parameters.subscriptionService  }}
+        rgEnvironment: ${{ env.rgEnvironment }}
+        apiName: ${{ env.apiName }}
+        appSettings: ${{ env. parameters.apiSettings  }}
+  qa_Stage_deploy_api:
+    needs:
+    - qa_Stage_settings_api
+    env:
+      template: ../variables/qa.yml
+    if: (github.ref == 'refs/heads/main')
+    steps:
+    - uses: actions/checkout@v2
+    - # There is no conversion path for templates in GitHub Actions
+      run: |
+        #../steps/api-deploy-steps.yml
+        artifactsPath: ${{ env.artifactsPath }}
+        archiveFile: ${{ env.archiveFile }}
+        apiName: ${{ env.apiName }}
+        subscriptionId: ${{ env.subscriptionId }}
+        subscriptionService: ${{ env. parameters.subscriptionService  }}
+  staging_Stage_build_src:
+    needs:
+    - qa_Stage_build_src
+    - qa_Stage_test_unit
+    - qa_Stage_package_api
+    - qa_Stage_settings_api
+    - qa_Stage_deploy_api
+    env:
+      template: ../variables/staging.yml
+    if: (success('qa') && (github.ref == 'refs/heads/main'))
+    steps:
+    - uses: actions/checkout@v2
+    - # There is no conversion path for templates in GitHub Actions
+      run: |
+        #../steps/dotnet-build-steps.yml
+        artifactsPath: ${{ env.artifactsPath }}
+        srcPath: ${{ env.srcPath }}
+  staging_Stage_test_unit:
+    needs:
+    - qa_Stage_build_src
+    - qa_Stage_test_unit
+    - qa_Stage_package_api
+    - qa_Stage_settings_api
+    - qa_Stage_deploy_api
+    - staging_Stage_build_src
+    env:
+      template: ../variables/staging.yml
+    if: (success('qa') && (github.ref == 'refs/heads/main'))
+    steps:
+    - uses: actions/checkout@v2
+    - # There is no conversion path for templates in GitHub Actions
+      run: |
+        #../steps/dotnet-test-steps.yml
+        testPath: ${{ env.unitPath }}
+        testProject: ${{ env.unitProject }}
+        restorePath: ${{ env.srcPath }}
+        appcsEnvironmentVariable: ${{ env.appcsEnvironmentVariable }}
+        appcsConnection: ${{ env.appcsConnection }}
+        rgEnvironment: ${{ env.rgEnvironment }}
+  staging_Stage_package_api:
+    needs:
+    - qa_Stage_build_src
+    - qa_Stage_test_unit
+    - qa_Stage_package_api
+    - qa_Stage_settings_api
+    - qa_Stage_deploy_api
+    - staging_Stage_test_unit
+    env:
+      template: ../variables/staging.yml
+    if: (success('qa') && (github.ref == 'refs/heads/main'))
+    steps:
+    - uses: actions/checkout@v2
+    - # There is no conversion path for templates in GitHub Actions
+      run: |
+        #../steps/dotnet-publish-steps.yml
+        artifactsPath: ${{ env.artifactspath }}
+        restorePath: ${{ env.srcpath }}
+        scriptsPath: ${{ env.scriptspath }}
+        srcPath: ${{ env.apipath }}
+        srcProject: ${{ env.apiProject }}
+  staging_Stage_settings_api:
+    needs:
+    - qa_Stage_build_src
+    - qa_Stage_test_unit
+    - qa_Stage_package_api
+    - qa_Stage_settings_api
+    - qa_Stage_deploy_api
+    - staging_Stage_package_api
+    env:
+      template: ../variables/staging.yml
+    if: (success('qa') && (github.ref == 'refs/heads/main'))
+    steps:
+    - uses: actions/checkout@v2
+    - # There is no conversion path for templates in GitHub Actions
+      run: |
+        #../steps/api-settings-steps.yml
+        subscriptionService: ${{ env. parameters.subscriptionService  }}
+        rgEnvironment: ${{ env.rgEnvironment }}
+        apiName: ${{ env.apiName }}
+        appSettings: ${{ env. parameters.apiSettings  }}
+  staging_Stage_deploy_api:
+    needs:
+    - qa_Stage_build_src
+    - qa_Stage_test_unit
+    - qa_Stage_package_api
+    - qa_Stage_settings_api
+    - qa_Stage_deploy_api
+    - staging_Stage_settings_api
+    env:
+      template: ../variables/staging.yml
+    if: (success('qa') && (github.ref == 'refs/heads/main'))
+    steps:
+    - uses: actions/checkout@v2
+    - # There is no conversion path for templates in GitHub Actions
+      run: |
+        #../steps/api-deploy-steps.yml
+        artifactsPath: ${{ env.artifactsPath }}
+        archiveFile: ${{ env.archiveFile }}
+        apiName: ${{ env.apiName }}
+        subscriptionId: ${{ env.subscriptionId }}
+        subscriptionService: ${{ env. parameters.subscriptionService  }}
+  production_Stage_build_src:
+    env:
+      template: ../variables/production.yml
+    if: (github.ref == 'refs/heads/production')
+    steps:
+    - uses: actions/checkout@v2
+    - # There is no conversion path for templates in GitHub Actions
+      run: |
+        #../steps/dotnet-build-steps.yml
+        artifactsPath: ${{ env.artifactsPath }}
+        srcPath: ${{ env.srcPath }}
+  production_Stage_test_unit:
+    needs:
+    - production_Stage_build_src
+    env:
+      template: ../variables/production.yml
+    if: (github.ref == 'refs/heads/production')
+    steps:
+    - uses: actions/checkout@v2
+    - # There is no conversion path for templates in GitHub Actions
+      run: |
+        #../steps/dotnet-test-steps.yml
+        testPath: ${{ env.unitPath }}
+        testProject: ${{ env.unitProject }}
+        restorePath: ${{ env.srcPath }}
+        appcsEnvironmentVariable: ${{ env.appcsEnvironmentVariable }}
+        appcsConnection: ${{ env.appcsConnection }}
+        rgEnvironment: ${{ env.rgEnvironment }}
+  production_Stage_package_api:
+    needs:
+    - production_Stage_test_unit
+    env:
+      template: ../variables/production.yml
+    if: (github.ref == 'refs/heads/production')
+    steps:
+    - uses: actions/checkout@v2
+    - # There is no conversion path for templates in GitHub Actions
+      run: |
+        #../steps/dotnet-publish-steps.yml
+        artifactsPath: ${{ env.artifactspath }}
+        restorePath: ${{ env.srcpath }}
+        scriptsPath: ${{ env.scriptspath }}
+        srcPath: ${{ env.apipath }}
+        srcProject: ${{ env.apiProject }}
+  production_Stage_settings_api:
+    needs:
+    - production_Stage_package_api
+    env:
+      template: ../variables/production.yml
+    if: (github.ref == 'refs/heads/production')
+    steps:
+    - uses: actions/checkout@v2
+    - # There is no conversion path for templates in GitHub Actions
+      run: |
+        #../steps/api-settings-steps.yml
+        subscriptionService: ${{ env. parameters.subscriptionService  }}
+        rgEnvironment: ${{ env.rgEnvironment }}
+        apiName: ${{ env.apiName }}
+        appSettings: ${{ env. parameters.apiSettings  }}
+  production_Stage_deploy_api:
+    needs:
+    - production_Stage_settings_api
+    env:
+      template: ../variables/production.yml
+    if: (github.ref == 'refs/heads/production')
+    steps:
+    - uses: actions/checkout@v2
+    - # There is no conversion path for templates in GitHub Actions
+      run: |
+        #../steps/api-deploy-steps.yml
+        artifactsPath: ${{ env.artifactsPath }}
+        archiveFile: ${{ env.archiveFile }}
+        apiName: ${{ env.apiName }}
+        subscriptionId: ${{ env.subscriptionId }}
+        subscriptionService: ${{ env. parameters.subscriptionService  }}
+                  

@@ -1,0 +1,54 @@
+on:
+  push:
+    branches:
+    - '*'
+    paths:
+    - .azure/*
+  pull-request:
+    branches-ignore:
+    - '*'
+env:
+  subscriptionService: AZURE_DEVOPS_SERVICE_CONNECTION
+  template: ../variables/common.yml
+jobs:
+  development_Stage_deploy_landing_zone:
+    env:
+      template: ../variables/development.yml
+    if: (github.ref != 'refs/heads/main')
+    steps:
+    - uses: actions/checkout@v2
+    - run: |
+        #../steps/landingzone-infrastructure-steps.yml
+        armPath: ${{ env.armPath }}
+        subscriptionId: ${{ env.subscriptionId }}
+        subscriptionService: ${{ env. parameters.subscriptionService  }}
+        rgName: ${{ env.rgName }}
+        rgLocation: ${{ env.rgLocation }}
+        appiName: ${{ env.appiName }}
+        kvName: ${{ env.kvName }}
+        stName: ${{ env.stName }}
+        workLocation: ${{ env.rgLocation }}
+        workName: ${{ env.workName }}
+        workResourceGroupName: ${{ env.workResourceGroupName }}
+        workSubscriptionId: ${{ env.subscriptionId }}
+  production_Stage_deploy_landing_zone:
+    env:
+      template: ../variables/production.yml
+    if: (github.ref == 'refs/heads/main')
+    steps:
+    - uses: actions/checkout@v2
+    - run: |
+        #../steps/landingzone-infrastructure-steps.yml
+        armPath: ${{ env.armPath }}
+        subscriptionId: ${{ env.subscriptionId }}
+        subscriptionService: ${{ env. parameters.subscriptionService  }}
+        rgName: ${{ env.rgName }}
+        rgLocation: ${{ env.rgLocation }}
+        appiName: ${{ env.appiName }}
+        kvName: ${{ env.kvName }}
+        stName: ${{ env.stName }}
+        workLocation: ${{ env.rgLocation }}
+        workName: ${{ env.workName }}
+        workResourceGroupName: ${{ env.workResourceGroupName }}
+        workSubscriptionId: ${{ env.subscriptionId }}
+                    
