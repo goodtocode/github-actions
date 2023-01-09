@@ -9,7 +9,7 @@ on:
 env:
   APPINSIGHTS_NAME: 'appi-PRODUCT-ENVIRONMENT-001'
   ARM_PATH: './.azure'
-  AZURE_RG_NAME: 'gtc-rg-PRODUCT-ENVIRONMENT-001'
+  AZURE_RG_NAME: 'COMPANY-rg-PRODUCT-ENVIRONMENT-001'
   AZURE_RG_LOCATION: 'westus3'
   KEYVAULT_NAME: 'kv-PRODUCT-ENVIRONMENT-001'
   PLAN_CAPACITY: 4
@@ -27,9 +27,6 @@ jobs:
   development_Stage_deploy_landing_zone:
     name: 'Deploy landing zone IaC'
     runs-on: ubuntu-latest
-    env:
-      template: ../variables/development.yml
-    if: (github.ref != 'refs/heads/main')
     steps:
       - name: Checkout
         uses: actions/checkout@v3

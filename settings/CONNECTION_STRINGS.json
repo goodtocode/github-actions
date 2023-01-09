@@ -1,0 +1,8 @@
+[
+    {
+        "name": "DefaultConnection",
+        "value": "conn-string-1",
+        "type": "SQLServer",
+        "slotSetting": false
+    }
+]
