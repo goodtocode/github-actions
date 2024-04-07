@@ -4,13 +4,13 @@ on:
     - main
     paths:
     - .github/workflows/gtc-rg-PRODUCT-landingzone.yml
-    - .azure/**/*.json
+    - .azure/**/*.bicep
   pull_request:
     branches:
     - main    
     paths:
     - .github/workflows/gtc-rg-PRODUCT-landingzone.yml
-    - .azure/**/*.json
+    - .azure/**/*.bicep
   workflow_dispatch:
     inputs:
       environment:
@@ -62,7 +62,7 @@ jobs:
         with:
           subscriptionId: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           resourceGroupName: ${{ env.AZURE_RG_NAME }}
-          template: ${{ env.ARM_PATH }}/st-storageaccount.json
+          template: ${{ env.ARM_PATH }}/st-storageaccount.bicep
           parameters: name=${{ env.STORAGE_NAME }}
       # kv-PRODUCT-ENVIRONMENT-001
       - name: Deploy ${{ env.KEYVAULT_NAME }}
@@ -70,7 +70,7 @@ jobs:
         with:
           subscriptionId: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           resourceGroupName: ${{ env.AZURE_RG_NAME }}
-          template: ${{ env.ARM_PATH }}/kv-keyvault.json
+          template: ${{ env.ARM_PATH }}/kv-keyvault.bicep
           parameters: name=${{ env.KEYVAULT_NAME }}
       # appi-PRODUCT-ENVIRONMENT-001
       - name: Deploy ${{ env.APPINSIGHTS_NAME }}
@@ -78,7 +78,7 @@ jobs:
         with:
           subscriptionId: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           resourceGroupName: ${{ env.AZURE_RG_NAME }}
-          template: ${{ env.ARM_PATH }}/appi-applicationinsights.json
+          template: ${{ env.ARM_PATH }}/appi-applicationinsights.bicep
           parameters: name=${{ env.APPINSIGHTS_NAME }} workName=${{ env.WORKSPACE_NAME }} workResourceGroupName=${{ env.SHARED_RG_NAME }}
       # api-PRODUCT-ENVIRONMENT-001
       - name: Deploy ${{ env.API_NAME }}
@@ -86,5 +86,5 @@ jobs:
         with:
           subscriptionId: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           resourceGroupName: ${{ env.AZURE_RG_NAME }}
-          template: ${{ env.ARM_PATH }}/api-apiapp.json
+          template: ${{ env.ARM_PATH }}/api-apiapp.bicep
           parameters: name=${{ env.API_NAME }} planName=${{ env.PLAN_NAME }} planResourceGroupName=${{ env.SHARED_RG_NAME }} appiKey=${{ secrets.APPI_KEY }} appiConnection=${{ secrets.APPI_CONNECTION }} rgEnvironment=${{ env.AZURE_RG_ENVIRONMENT }}
