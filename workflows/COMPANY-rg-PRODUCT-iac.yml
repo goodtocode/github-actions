@@ -3,7 +3,7 @@ on:
     branches-ignore:
       - main
     paths:
-      - .github/workflows/gtc-rg-PRODUCTNAME-infrastructure.yml
+      - .github/workflows/gtc-rg-PRODUCTNAME-iac.yml
       - .azure/**/*.bicep
       - .azure/**/*.bicepparams
   pull_request:
@@ -11,7 +11,7 @@ on:
     branches:
       - main
     paths:
-      - .github/workflows/gtc-rg-PRODUCTNAME-infrastructure.yml
+      - .github/workflows/gtc-rg-PRODUCTNAME-iac.yml
       - .azure/**/*.bicep
       - .azure/**/*.bicepparams
   workflow_dispatch:
