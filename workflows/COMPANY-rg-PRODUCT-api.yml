@@ -1,20 +1,22 @@
+name: CI/CD Build, Test and Deploy
+
 on:
-  push:
-    branches-ignore:
-    - main
-    paths:
-    - .github/workflows/gtc-rg-PRODUCT-api.yml
-    - src/PRODUCT/**
   pull_request:
     branches:
-    - main    
+      - main
     paths:
-    - .github/workflows/gtc-rg-PRODUCT-api.yml
-    - src/PRODUCT/**
+      - .github/workflows/COMPANY-rg-PRODUCT-ci-cd.yml
+      - src/**
+  push:
+    branches:
+    - main
+    paths:
+    - .github/workflows/COMPANY-rg-PRODUCT-ci-cd.yml
+    - src/**
   workflow_dispatch:
     inputs:
       environment:
-        description: 'Environment to run'     
+        description: 'Environment to run'
         required: true
         default: 'development'
       mode:
@@ -25,41 +27,35 @@ permissions:
   contents: read
   security-events: write
 
-jobs:  
-  build-test-and-deploy:
-    name: 'Build, Test and Deploy .NET'
+jobs:
+  ci:
+    name: 'CI Build, Test, Code QL, Publish'
     runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
     environment: development    
-
     strategy:
       matrix:
-        dotnet-version: [ '7.0.x' ]
+        DOTNET_VERSION: ['9.x']
 
     env:      
       AZURE_WEBAPP_NAME: api-PRODUCT-dev-001
       AZURE_WEBAPP_PACKAGE_PATH: '.'
-      AZURE_RG_NAME: 'gtc-rg-PRODUCT-dev-001'
+      AZURE_RG_NAME: 'COMPANY-rg-SUBSCRIPTION-PRODUCT-dev-001'
       RUNTIME_ENV: 'Development'
-      SRC_PATH: './src/PRODUCT'
-      SRC_SLN: 'COMPANY.PRODUCT.sln'      
-      API_PATH: 'Presentation/WebApi'
-      API_PROJECT: 'WebApi.csproj'
-      APPI_NAME: 'appi-PRODUCT-dev-001'
-      INFRA_PATH: 'Infrastructure/Persistence'
-      INFRA_PROJECT: 'Persistence.csproj'
-      UNIT_PATH: 'Specs/Application.Unit'
-      UNIT_PROJECT: 'Application.Unit.csproj'
+      SRC_PATH: './src'
+      SRC_SLN: 'PRODUCT.sln'      
+      API_PATH: 'Presentation.WebApi'
+      API_PROJECT: 'Presentation.WebApi.csproj'
+      TEST_PATH: 'Tests.Specs.Integration'
+      TEST_PROJECT: 'Tests.Specs.Integration.csproj'
       SCRIPTS_PATH: './.github/scripts'
-      SQL_NAME: 'sql-PRODUCTLINE-dev-001'
-      SQLDB_NAME: 'sqldb-PRODUCT-dev-001'
-      AZURE_CRED: '{"clientId":"${{ secrets.AZURE_CLIENT_ID }}","subscriptionId":"${{ secrets.SUBSCRIPTION_ID }}","tenantId":"${{ secrets.AZURE_TENANT_ID }}"}'
 
     steps:
       - name: checkout
         uses: actions/checkout@v3
 
       - name: dotnet version ${{ matrix.DOTNET_VERSION }}
-        uses: actions/setup-dotnet@v3
+        uses: actions/setup-dotnet@v4
         with:
           dotnet-version: ${{ matrix.DOTNET_VERSION }}
 
@@ -70,19 +66,132 @@ jobs:
           echo "VERSION=$version" >> $GITHUB_ENV
         shell: pwsh
 
-      - name: dotnet build test and publish
+      - name: pipeline configuration secrets
         run: |
-          dotnet build ${{ env.SRC_PATH }}/${{ env.SRC_SLN }} --configuration Release       
-          dotnet test ${{ env.SRC_PATH }}/${{ env.UNIT_PATH }}/${{ env.UNIT_PROJECT }} --verbosity normal
-          dotnet publish ${{ env.SRC_PATH }}/${{ env.API_PATH }}/${{ env.API_PROJECT }} --configuration Release -o ${{ env.AZURE_WEBAPP_NAME }} 
+          echo "ASPNETCORE_ENVIRONMENT=${{ env.RUNTIME_ENV }}" >> $GITHUB_ENV
+          echo "AZURE_FUNCTIONS_ENVIRONMENT=${{ env.RUNTIME_ENV }}" >> $GITHUB_ENV
+          echo "OpenAI:ApiKey=${{ secrets.OPENAI_APIKEY }}" >> $GITHUB_ENV
         shell: pwsh
 
-      - name: dotnet test results
-        uses: actions/upload-artifact@v3
+      - name: App Settings Variable Substitution
+        uses: microsoft/variable-substitution@v1
+        with:
+          files: '${{ env.SRC_PATH }}/${{ env.API_PATH }}/appsettings.json, ${{ env.SRC_PATH }}/${{ env.API_PATH }}/appsettings.${{ env.RUNTIME_ENV }}.json, ${{ env.SRC_PATH }}/${{ env.TEST_PATH }}/appsettings.test.json'
+        env: 
+          OpenAI.ApiKey: ${{ secrets.OPENAI_APIKEY }}
+          
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: csharp
+            
+      - name: Build
+        run: |
+          dotnet build ${{ env.SRC_PATH }}/${{ env.SRC_SLN }} --configuration Release       
+        shell: pwsh
+
+      - name: Test
+        run: |
+          mkdir -p TestResults-${{ matrix.DOTNET_VERSION }}
+          dotnet test ${{ env.SRC_PATH }}/${{ env.TEST_PATH }}/${{ env.TEST_PROJECT }} --logger "trx;LogFileName=test_results.trx" --results-directory TestResults-${{ matrix.DOTNET_VERSION }} --verbosity normal
+        shell: pwsh
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
         with:
           name: dotnet-results-${{ matrix.DOTNET_VERSION }}
           path: TestResults-${{ matrix.DOTNET_VERSION }}
         if: ${{ always() }}
+
+      - name: Perform CodeQL Analysis 
+        uses: github/codeql-action/analyze@v3
+
+  cd:
+    name: 'CD Deploy on Azure'
+    runs-on: ubuntu-latest
+    needs: ci
+    if: |
+      github.event_name == 'push' &&
+      contains(github.ref, 'refs/tags/deploy')
+    environment: development    
+    strategy:
+      matrix:
+        DOTNET_VERSION: ['9.x']
+
+    env:      
+      AZURE_WEBAPP_NAME: api-PRODUCT-dev-001
+      AZURE_WEBAPP_PACKAGE_PATH: '.'
+      AZURE_RG_NAME: 'COMPANY-rg-SUBSCRIPTION-PRODUCT-dev-001'
+      RUNTIME_ENV: 'Development'
+      SRC_PATH: './src'
+      SRC_SLN: 'SemanticKernelMicroservice.sln'      
+      API_PATH: 'Presentation.WebApi'
+      API_PROJECT: 'Presentation.WebApi.csproj'
+      APPI_NAME: 'appi-PRODUCT-dev-001'
+      TEST_PATH: 'Tests.Specs.Integration'
+      TEST_PROJECT: 'Tests.Specs.Integration.csproj'
+      SCRIPTS_PATH: './.github/scripts'
+      AZURE_CRED: '{"clientId":"${{ secrets.AZURE_CLIENT_ID }}","subscriptionId":"${{ secrets.SUBSCRIPTION_ID }}","tenantId":"${{ secrets.AZURE_TENANT_ID }}"}'
+
+    steps:
+      - name: checkout
+        uses: actions/checkout@v3
+
+      - name: dotnet version ${{ matrix.DOTNET_VERSION }}
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ matrix.DOTNET_VERSION }}
+
+      - name: Set-Version.ps1
+        run: |
+          $version = ${{ env.SCRIPTS_PATH }}/Set-Version.ps1 -Path ${{ env.SRC_PATH }} -VersionToReplace 1.0.0
+          echo $version
+          echo "VERSION=$version" >> $GITHUB_ENV
+        shell: pwsh
+
+      - name: pipeline configuration secrets
+        run: |
+          echo "ASPNETCORE_ENVIRONMENT=${{ env.RUNTIME_ENV }}" >> $GITHUB_ENV
+          echo "AZURE_FUNCTIONS_ENVIRONMENT=${{ env.RUNTIME_ENV }}" >> $GITHUB_ENV
+          echo "OpenAI:ApiKey=${{ secrets.OPENAI_APIKEY }}" >> $GITHUB_ENV
+        shell: pwsh
+
+      - name: App Settings Variable Substitution
+        uses: microsoft/variable-substitution@v1
+        with:
+          files: '${{ env.SRC_PATH }}/${{ env.API_PATH }}/appsettings.json, ${{ env.SRC_PATH }}/${{ env.API_PATH }}/appsettings.${{ env.RUNTIME_ENV }}.json, ${{ env.SRC_PATH }}/${{ env.TEST_PATH }}/appsettings.test.json'
+        env: 
+          OpenAI.ApiKey: ${{ secrets.OPENAI_APIKEY }}
+          
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: csharp
+            
+      - name: Build
+        run: |
+          dotnet build ${{ env.SRC_PATH }}/${{ env.SRC_SLN }} --configuration Release       
+        shell: pwsh
+
+      - name: Test
+        run: |
+          dotnet test ${{ env.SRC_PATH }}/${{ env.TEST_PATH }}/${{ env.TEST_PROJECT }} --logger "trx;LogFileName=TestResults-${{ matrix.DOTNET_VERSION }}/test_results.trx" --verbosity normal
+        shell: pwsh
+
+      - name: Publish
+        run: |
+          dotnet publish ${{ env.SRC_PATH }}/${{ env.API_PATH }}/${{ env.API_PROJECT }} --configuration Release -o ${{ env.AZURE_WEBAPP_NAME }} 
+        shell: pwsh
+
+      - name: dotnet test results
+        uses: actions/upload-artifact@v4
+        with:
+          name: dotnet-results-${{ matrix.DOTNET_VERSION }}
+          path: TestResults-${{ matrix.DOTNET_VERSION }}
+        if: ${{ always() }}
+
+      - name: Perform CodeQL Analysis 
+        uses: github/codeql-action/analyze@v3
 
       - name: az login
         uses: azure/login@v1
@@ -138,20 +247,6 @@ jobs:
           az webapp config appsettings set -g ${{ env.AZURE_RG_NAME }} -n ${{ env.AZURE_WEBAPP_NAME }} --settings ASPNETCORE_ENVIRONMENT=${{ env.RUNTIME_ENV }}
         shell: pwsh
 
-      # Get Azure SQL DB Conenction: az sql db show-connection-string --client ado.net --server ${{ env.SQL_NAME }} --name ${{ env.SQLDB_NAME }} -o tsv
-      - name: ${{ env.AZURE_WEBAPP_NAME }} connection strings
-        run: |
-          $TEMP_STR=az sql db show-connection-string --client ado.net --server ${{ env.SQL_NAME }} --name ${{ env.SQLDB_NAME }} -o tsv
-          $TEMP_STR=$TEMP_STR.replace("<username>", "${{ secrets.SQL_USER }}")
-          $TEMP_STR=$TEMP_STR.replace("<password>", "${{ secrets.SQL_PASSWORD }}")
-          az webapp config connection-string set -g ${{ env.AZURE_RG_NAME }} -n ${{ env.AZURE_WEBAPP_NAME }} -t SQLServer --settings DefaultConnection=$TEMP_STR
-          dotnet tool install --global dotnet-ef
-          dotnet tool restore          
-          dotnet ef migrations add v${{ env.VERSION }} --project ${{ env.SRC_PATH }}/${{ env.INFRA_PATH }}/${{ env.INFRA_PROJECT }} --startup-project ${{ env.SRC_PATH }}/${{ env.API_PATH }}/${{ env.API_PROJECT }} --context PRODUCTDbContext
-          dotnet ef migrations script --project ${{ env.SRC_PATH }}/${{ env.INFRA_PATH }}/${{ env.INFRA_PROJECT }} --startup-project ${{ env.SRC_PATH }}/${{ env.API_PATH }}/${{ env.API_PROJECT }} --context PRODUCTDbContext --output ${{ github.workspace }}/sql/migrations.sql --idempotent
-          dotnet ef database update --project ${{ env.SRC_PATH }}/${{ env.INFRA_PATH }}/${{ env.INFRA_PROJECT }} --startup-project ${{ env.SRC_PATH }}/${{ env.API_PATH }}/${{ env.API_PROJECT }} --context PRODUCTDbContext --connection $TEMP_STR
-        shell: pwsh
-           
       - name: Swap to production slot
         run: |
           az webapp deployment slot swap --resource-group ${{ env.AZURE_RG_NAME }} --name ${{ env.AZURE_WEBAPP_NAME }} --slot staging --target-slot production
