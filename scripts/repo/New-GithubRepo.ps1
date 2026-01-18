@@ -27,7 +27,8 @@ $vis     = $Oss.IsPresent ? 'public' : $Visibility
 if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
   Write-Host "GitHub CLI not found. Installing via winget..."
   winget install --id GitHub.cli -e --silent
-  Import-Module gh
+  Write-Host "GitHub CLI installed. Please restart your terminal or PowerShell session, then re-run this script."
+  exit
 }
 
 # Check authentication
@@ -147,7 +148,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: github/codeql-action/init@v3
         with:
-          languages: ${{ matrix.language }}
+          languages: '`${{ matrix.language }}'
       - uses: github/codeql-action/autobuild@v3
       - uses: github/codeql-action/analyze@v3
 "@
