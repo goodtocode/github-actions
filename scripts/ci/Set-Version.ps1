@@ -26,14 +26,18 @@ param
 # ***
 if ($IsWindows) { Set-ExecutionPolicy Unrestricted -Scope Process -Force }
 $VerbosePreference = 'SilentlyContinue' #'Continue'
-[String]$ThisScript = $MyInvocation.MyCommand.Path
-[String]$ThisDir = Split-Path $ThisScript
-[DateTime]$Now = Get-Date
-Write-Debug "*****************************"
-Write-Debug "*** Starting: $ThisScript on $Now"
-Write-Debug "*****************************"
-# Imports
-Import-Module "$ThisDir/System.psm1"
+if ($MyInvocation.MyCommand -and $MyInvocation.MyCommand.Path) {
+	[String]$ThisScript = $MyInvocation.MyCommand.Path
+	[String]$ThisDir = Split-Path $ThisScript
+	[DateTime]$Now = Get-Date
+	Write-Debug "*****************************"
+	Write-Debug "*** Starting: $ThisScript on $Now"
+	Write-Debug "*****************************"
+	# Imports
+	Import-Module "$ThisDir/../System.psm1"
+} else {
+	Write-Verbose "No script file context detected. Skipping module import."
+}
 
 # ***
 # *** Validate and cleanse
