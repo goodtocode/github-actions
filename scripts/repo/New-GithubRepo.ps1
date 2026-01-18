@@ -3,6 +3,12 @@
 # Creates repo, enables security, branch policy, environments, and secrets
 # Requires: GitHub CLI (gh) + authenticated session
 # ================================
+#
+# Example usage (copy/paste):
+#
+#   .\New-GithubRepo.ps1 -Owner goodtocode -Repo my-repo -Visibility private
+#   .\New-GithubRepo.ps1 -Owner goodtocode -Repo my-oss-repo -Oss
+#
 
 param(
   [Parameter(Mandatory=$true)][string]$Owner,
@@ -15,21 +21,35 @@ param(
 $license = $Oss.IsPresent ? 'mit' : $null
 $vis     = $Oss.IsPresent ? 'public' : $Visibility
 
-$createArgs = @(
-  'repo','create', "$Owner/$Repo",
-  '--' + $vis,
-  '--add-readme',
-  '--gitignore','VisualStudio'
-)
-if ($license) { $createArgs += @('--license', $license) }
-
 gh @createArgs | Out-Null
-Write-Host "Created repo $Owner/$Repo"
+
+# Check if repo exists before creating
+$repoExists = gh repo view "$Owner/$Repo" 2>$null
+if (-not $repoExists) {
+    $createArgs = @(
+      'repo','create', "$Owner/$Repo",
+      '--' + $vis,
+      '--add-readme',
+      '--gitignore','VisualStudio'
+    )
+    if ($license) { $createArgs += @('--license', $license) }
+    gh @createArgs | Out-Null
+    Write-Host "Created repo $Owner/$Repo"
+} else {
+    Write-Host "Repo $Owner/$Repo already exists. Skipping creation."
+}
 
 # ---- 1) Allow auto-merge (repo-level toggle)
 # Enables future workflows to set --auto on PRs
-gh api -X PATCH "repos/$Owner/$Repo" `
-  -f allow_auto_merge=true | Out-Null
+if ($repoExists) {
+  $autoMergeStatus = gh api "repos/$Owner/$Repo" | ConvertFrom-Json | Select-Object -ExpandProperty allow_auto_merge
+  if (-not $autoMergeStatus) {
+    gh api -X PATCH "repos/$Owner/$Repo" -f allow_auto_merge=true | Out-Null
+    Write-Host "Enabled auto-merge."
+  } else {
+    Write-Host "Auto-merge already enabled."
+  }
+}
 # Ref: Auto-merge settings docs. [6](https://deepwiki.com/peter-evans/create-pull-request)
 
 # ---- 2) Enable security & analysis: Secret Scanning + Push Protection
@@ -40,8 +60,15 @@ $secJson = @'
   "secret_scanning_push_protection": { "status": "enabled" }
 }
 '@
-gh api -X PATCH "repos/$Owner/$Repo" `
-  -f "security_and_analysis=$secJson" | Out-Null
+if ($repoExists) {
+  $secStatus = gh api "repos/$Owner/$Repo" | ConvertFrom-Json | Select-Object -ExpandProperty security_and_analysis
+  if ($secStatus.secret_scanning.status -ne "enabled" -or $secStatus.secret_scanning_push_protection.status -ne "enabled") {
+    gh api -X PATCH "repos/$Owner/$Repo" -f "security_and_analysis=$secJson" | Out-Null
+    Write-Host "Enabled secret scanning and push protection."
+  } else {
+    Write-Host "Secret scanning and push protection already enabled."
+  }
+}
 # Ref: Secret scanning & push protection via REST. [2](https://commandmasters.com/commands/gh-repo-common/)
 
 # ---- 3) Enable Dependabot alerts & security updates (and add version updates file)
@@ -65,10 +92,18 @@ updates:
 
 $tmp = New-TemporaryFile
 $dependabotYml | Set-Content -NoNewline -Path $tmp
-gh api --method PUT "/repos/$Owner/$Repo/contents/.github/dependabot.yml" `
-  -f message="chore: add dependabot version updates" `
-  -f content="$( [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes((Get-Content $tmp -Raw))) )" `
-  -f branch="main" | Out-Null
+if ($repoExists) {
+    $fileExists = gh api "/repos/$Owner/$Repo/contents/.github/dependabot.yml" 2>$null
+    if (-not $fileExists) {
+        gh api --method PUT "/repos/$Owner/$Repo/contents/.github/dependabot.yml" `
+          -f message="chore: add dependabot version updates" `
+          -f content="$( [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes((Get-Content $tmp -Raw))) )" `
+          -f branch="main" | Out-Null
+        Write-Host "Added dependabot.yml."
+    } else {
+        Write-Host "dependabot.yml already exists. Skipping."
+    }
+}
 Remove-Item $tmp -Force
 # Ref: Dependabot version updates are file-based. [4](https://victoronsoftware.com/posts/github-reusable-workflows-and-steps/)
 
@@ -103,10 +138,18 @@ jobs:
 
 $tmp = New-TemporaryFile
 $codeqlYml | Set-Content -NoNewline -Path $tmp
-gh api --method PUT "/repos/$Owner/$Repo/contents/.github/workflows/codeql-analysis.yml" `
-  -f message="ci: add CodeQL advanced workflow" `
-  -f content="$( [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes((Get-Content $tmp -Raw))) )" `
-  -f branch="main" | Out-Null
+if ($repoExists) {
+    $fileExists = gh api "/repos/$Owner/$Repo/contents/.github/workflows/codeql-analysis.yml" 2>$null
+    if (-not $fileExists) {
+        gh api --method PUT "/repos/$Owner/$Repo/contents/.github/workflows/codeql-analysis.yml" `
+          -f message="ci: add CodeQL advanced workflow" `
+          -f content="$( [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes((Get-Content $tmp -Raw))) )" `
+          -f branch="main" | Out-Null
+        Write-Host "Added CodeQL workflow."
+    } else {
+        Write-Host "CodeQL workflow already exists. Skipping."
+    }
+}
 Remove-Item $tmp -Force
 # Ref: Advanced setup is workflow-based & fully automatable. [8](https://graphite.com/guides/github-merge-queue)
 
@@ -114,12 +157,20 @@ Remove-Item $tmp -Force
 # You can add named checks later once they appear (ci, CodeQL) to hard-enforce.
 $requiredPullRequestReviews = '{"require_code_owner_reviews":false,"required_approving_review_count":1}'
 $restrictions = '{"users":[],"teams":[],"apps":[]}'
-gh api -X PUT "repos/$Owner/$Repo/branches/main/protection" `
-  -f required_status_checks.strict=true `
-  -f required_status_checks.contexts='[]' `
-  -f enforce_admins=true `
-  -f "required_pull_request_reviews=$requiredPullRequestReviews" `
-  -f "restrictions=$restrictions" | Out-Null
+if ($repoExists) {
+    $protection = gh api "repos/$Owner/$Repo/branches/main/protection" 2>$null
+    if (-not $protection) {
+        gh api -X PUT "repos/$Owner/$Repo/branches/main/protection" `
+          -f required_status_checks.strict=true `
+          -f required_status_checks.contexts='[]' `
+          -f enforce_admins=true `
+          -f "required_pull_request_reviews=$requiredPullRequestReviews" `
+          -f "restrictions=$restrictions" | Out-Null
+        Write-Host "Branch protection added."
+    } else {
+        Write-Host "Branch protection already exists. Skipping."
+    }
+}
 # Ref: Branch protection REST. [5](https://stackoverflow.com/questions/71623045/automatic-merge-after-tests-pass-using-actions)
 
 # ---- 6) Create Environments: development & production
@@ -136,9 +187,17 @@ $devEnv = @'
   }
 }
 '@
-gh api -X PUT "repos/$Owner/$Repo/environments/development" `
-  -H "Accept: application/vnd.github+json" `
-  -f "environment=$devEnv" | Out-Null
+if ($repoExists) {
+    $devExists = gh api "repos/$Owner/$Repo/environments/development" 2>$null
+    if (-not $devExists) {
+        gh api -X PUT "repos/$Owner/$Repo/environments/development" `
+          -H "Accept: application/vnd.github+json" `
+          -f "environment=$devEnv" | Out-Null
+        Write-Host "Development environment created."
+    } else {
+        Write-Host "Development environment already exists. Skipping."
+    }
+}
 # Optionally add a custom branch policy pattern for dev (requires extra POST endpoint under env policies).
 # See community examples for adding custom branch policies after creation. [13](https://stackoverflow.com/questions/70943164/create-environment-for-repository-using-gh)
 
@@ -155,15 +214,37 @@ $prodEnv = @"
 }
 "@
 # NOTE: Replace reviewers with concrete users/teams via separate calls if needed.
-gh api -X PUT "repos/$Owner/$Repo/environments/production" `
-  -H "Accept: application/vnd.github+json" `
-  -f "environment=$prodEnv" | Out-Null
+if ($repoExists) {
+    $prodExists = gh api "repos/$Owner/$Repo/environments/production" 2>$null
+    if (-not $prodExists) {
+        gh api -X PUT "repos/$Owner/$Repo/environments/production" `
+          -H "Accept: application/vnd.github+json" `
+          -f "environment=$prodEnv" | Out-Null
+        Write-Host "Production environment created."
+    } else {
+        Write-Host "Production environment already exists. Skipping."
+    }
+}
 # Ref: Environments API supports branch policy and protection rules. [7](https://docs.github.com/en/rest/deployments/environments)
 
 # ---- 7) Add environment secrets (examples)
 # Actions/environment secrets endpoints exist; gh can set if env already exists.
-gh secret set "DEV_API_KEY" --body "replace-me" --repo "$Owner/$Repo" --env "development"
-gh secret set "PROD_API_KEY" --body "replace-me" --repo "$Owner/$Repo" --env "production"
+if ($repoExists) {
+  $devSecret = gh secret list --repo "$Owner/$Repo" --env "development" | Select-String "DEV_API_KEY"
+  if (-not $devSecret) {
+    gh secret set "DEV_API_KEY" --body "replace-me" --repo "$Owner/$Repo" --env "development"
+    Write-Host "DEV_API_KEY secret added to development."
+  } else {
+    Write-Host "DEV_API_KEY already exists in development. Skipping."
+  }
+  $prodSecret = gh secret list --repo "$Owner/$Repo" --env "production" | Select-String "PROD_API_KEY"
+  if (-not $prodSecret) {
+    gh secret set "PROD_API_KEY" --body "replace-me" --repo "$Owner/$Repo" --env "production"
+    Write-Host "PROD_API_KEY secret added to production."
+  } else {
+    Write-Host "PROD_API_KEY already exists in production. Skipping."
+  }
+}
 # Ref: Create env, then assign secrets to it. [7](https://docs.github.com/en/rest/deployments/environments)
 
 Write-Host "✅ Bootstrap completed for $Owner/$Repo"
