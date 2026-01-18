@@ -4,12 +4,15 @@
 # Requires: GitHub CLI (gh) + authenticated session
 # ================================
 #
+# Pre-requisites (auto-executed):
+# - Installs GitHub CLI if not present
+# - Prompts for GitHub authentication if not already authenticated
+#
 # Example usage (copy/paste):
 #
 #   .\New-GithubRepo.ps1 -Owner goodtocode -Repo my-repo -Visibility private
 #   .\New-GithubRepo.ps1 -Owner goodtocode -Repo my-oss-repo -Oss
 #
-
 param(
   [Parameter(Mandatory=$true)][string]$Owner,
   [Parameter(Mandatory=$true)][string]$Repo,
@@ -20,6 +23,19 @@ param(
 # ---- 0) Create repository with README, .gitignore, license (if OSS)
 $license = $Oss.IsPresent ? 'mit' : $null
 $vis     = $Oss.IsPresent ? 'public' : $Visibility
+
+if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
+  Write-Host "GitHub CLI not found. Installing via winget..."
+  winget install --id GitHub.cli -e --silent
+  Import-Module gh
+}
+
+# Check authentication
+$ghAuth = gh auth status 2>$null
+if (-not $ghAuth) {
+  Write-Host "GitHub CLI not authenticated. Please login."
+  gh auth login
+}
 
 gh @createArgs | Out-Null
 
