@@ -10,8 +10,8 @@
 #
 # Example usage (copy/paste):
 #
-#   .\New-GithubRepo.ps1 -Owner goodtocode -Repo my-repo -Visibility private
-#   .\New-GithubRepo.ps1 -Owner goodtocode -Repo my-oss-repo -Oss
+#   .\New-GithubRepoBootstrap.ps1 -Owner goodtocode -Repo my-repo -Visibility private
+#   .\New-GithubRepoBootstrap.ps1 -Owner goodtocode -Repo my-oss-repo -Oss
 #
 param(
   [Parameter(Mandatory=$true)][string]$Owner,
@@ -71,7 +71,6 @@ if ($repoExists) {
     Write-Host "Auto-merge already enabled."
   }
 }
-# Ref: Auto-merge settings docs. [6](https://deepwiki.com/peter-evans/create-pull-request)
 
 # ---- 2) Enable security & analysis: Secret Scanning + Push Protection
 # (security_and_analysis object)
@@ -90,13 +89,11 @@ if ($repoExists) {
     Write-Host "Secret scanning and push protection already enabled."
   }
 }
-# Ref: Secret scanning & push protection via REST. [2](https://commandmasters.com/commands/gh-repo-common/)
 
 # ---- 3) Enable Dependabot alerts & security updates (and add version updates file)
 # Alerts / Security updates are repository settings endpoints.
 # (If your org enforces these by default, you can skip.)
-# List/enable endpoints are under Repositories API group. [3](https://docs.github.com/en/rest/repos)
-
+# List/enable endpoints are under Repositories API group. 
 # Add dependabot.yml (version updates) if you want scheduled updates:
 $dependabotYml = @"
 version: 2
@@ -126,10 +123,9 @@ if ($repoExists) {
     }
 }
 Remove-Item $tmp -Force
-# Ref: Dependabot version updates are file-based. [4](https://victoronsoftware.com/posts/github-reusable-workflows-and-steps/)
 
 # ---- 4) (Option A) Add Advanced CodeQL workflow file for full automation
-# Skip if you prefer to enable Default setup in UI.
+# Or Advanced setup is workflow-based & fully automatable. [8](https://graphite.com/guides/github-merge-queue)
 $codeqlYml = @"
 name: CodeQL
 on:
@@ -172,7 +168,7 @@ if ($repoExists) {
     }
 }
 Remove-Item $tmp -Force
-# Ref: Advanced setup is workflow-based & fully automatable. [8](https://graphite.com/guides/github-merge-queue)
+
 
 # ---- 5) Branch protection for main (require PRs, strict checks etc.)
 # You can add named checks later once they appear (ci, CodeQL) to hard-enforce.
