@@ -146,11 +146,11 @@ jobs:
         language: [ 'csharp' ]
     steps:
       - uses: actions/checkout@v4
-      - uses: github/codeql-action/init@v3
+      - uses: cigithub/codeql-action/init@v4
         with:
           languages: '`${{ matrix.language }}'
-      - uses: github/codeql-action/autobuild@v3
-      - uses: github/codeql-action/analyze@v3
+      - uses: github/codeql-action/autobuild@v4
+      - uses: github/codeql-action/analyze@v4
 "@
 
 $tmp = New-TemporaryFile
@@ -168,29 +168,53 @@ if ($repoExists) {
     }
 }
 Remove-Item $tmp -Force
-
-
-# ---- 5) Branch protection for main (require PRs, strict checks etc.)
-# You can add named checks later once they appear (ci, CodeQL) to hard-enforce.
+# ---- 5) Create ruleset for main branch (require PRs, all checks)
 if ($repoExists) {
-    $protectionResult = gh api "repos/$Owner/$Repo/branches/main/protection" 2>&1
-    if ($protectionResult -match 'Branch not protected' -or $protectionResult -match '404') {
-        $body = @{
-            required_status_checks = $null
-            enforce_admins = $false
-            required_pull_request_reviews = @{
-                required_approving_review_count = 1
-            }
-            restrictions = $null
-        } | ConvertTo-Json -Compress
 
-        $body | gh api -X PUT "repos/$Owner/$Repo/branches/main/protection" --input - -H "Accept: application/vnd.github+json"
-        Write-Host "Branch protection added."
-    } else {
-        Write-Host "Branch protection already exists. Skipping."
+  $rulesetBody = [ordered]@{
+    name = "main-ruleset"
+    target = "branch"
+    enforcement = "active"
+    conditions = @{
+      ref_name = @{
+        include = @("refs/heads/main")
+        exclude = @()
+      }
     }
+
+    # --- RULE: Pull Request requirements ---
+    pull_request = @{
+      required_approving_review_count = 0
+      require_code_owner_review = $false
+      require_last_push_approval = $false
+      required_review_thread_resolution = $false
+    }
+
+    # --- RULE: Required Status Checks ---
+    required_status_checks = @{
+      strict_required_status_checks_policy = $true
+      do_not_enforce_on_create = $false
+      required_status_checks = @(
+        @{
+          context = "*"
+          integration_id = $null
+        }
+      )
+    }
+  }
+
+  $rulesetBodyJson = $rulesetBody | ConvertTo-Json -Depth 10 -Compress
+
+  $existingRulesets = gh api "/repos/$Owner/$Repo/rulesets" | ConvertFrom-Json
+  $mainRuleset = $existingRulesets | Where-Object { $_.name -eq "main-ruleset" }
+
+  if (-not $mainRuleset) {
+    $rulesetBodyJson | gh api -X POST "/repos/$Owner/$Repo/rulesets" --input - -H "Accept: application/vnd.github+json"
+    Write-Host "Ruleset 'main-ruleset' created."
+  } else {
+    Write-Host "Ruleset 'main-ruleset' already exists. Skipping."
+  }
 }
-# Ref: Branch protection REST. [5](https://stackoverflow.com/questions/71623045/automatic-merge-after-tests-pass-using-actions)
 
 # ---- 6) Create Environments: development & production
 # (You can set branch policy + required reviewers)
