@@ -146,7 +146,7 @@ jobs:
         language: [ 'csharp' ]
     steps:
       - uses: actions/checkout@v4
-      - uses: github/codeql-action/init@v3
+      - uses: cigithub/codeql-action/init@v4
         with:
           languages: '`${{ matrix.language }}'
       - uses: github/codeql-action/autobuild@v3
