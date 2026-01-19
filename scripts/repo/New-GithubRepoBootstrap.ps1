@@ -172,17 +172,19 @@ Remove-Item $tmp -Force
 
 # ---- 5) Branch protection for main (require PRs, strict checks etc.)
 # You can add named checks later once they appear (ci, CodeQL) to hard-enforce.
-$requiredPullRequestReviews = '{"require_code_owner_reviews":false,"required_approving_review_count":1}'
-$restrictions = '{"users":[],"teams":[],"apps":[]}'
 if ($repoExists) {
-    $protection = gh api "repos/$Owner/$Repo/branches/main/protection" 2>$null
-    if (-not $protection) {
-        gh api -X PUT "repos/$Owner/$Repo/branches/main/protection" `
-          -f required_status_checks.strict=true `
-          -f required_status_checks.contexts='[]' `
-          -f enforce_admins=true `
-          -f "required_pull_request_reviews=$requiredPullRequestReviews" `
-          -f "restrictions=$restrictions" | Out-Null
+    $protectionResult = gh api "repos/$Owner/$Repo/branches/main/protection" 2>&1
+    if ($protectionResult -match 'Branch not protected' -or $protectionResult -match '404') {
+        $body = @{
+            required_status_checks = $null
+            enforce_admins = $false
+            required_pull_request_reviews = @{
+                required_approving_review_count = 1
+            }
+            restrictions = $null
+        } | ConvertTo-Json -Compress
+
+        $body | gh api -X PUT "repos/$Owner/$Repo/branches/main/protection" --input - -H "Accept: application/vnd.github+json"
         Write-Host "Branch protection added."
     } else {
         Write-Host "Branch protection already exists. Skipping."
