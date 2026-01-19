@@ -29,7 +29,7 @@ Write-Host "*****************************"
 Write-Host "*** Starting: $ThisScript on $Now"
 Write-Host "*****************************"
 # Imports
-Import-Module "./System.psm1"
+Import-Module "../System.psm1"
 Install-Module -Name Az.Accounts -AllowClobber -Scope CurrentUser
 Install-Module -Name Az.Resources -AllowClobber -Scope CurrentUser
 

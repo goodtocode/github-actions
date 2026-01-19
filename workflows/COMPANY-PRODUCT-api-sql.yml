@@ -61,7 +61,7 @@ jobs:
 
       - name: Set-Version.ps1
         run: |
-          $version = ${{ env.SCRIPTS_PATH }}/Set-Version.ps1 -Path ${{ env.SRC_PATH }} -VersionToReplace 1.0.0
+          $version = ${{ env.SCRIPTS_PATH }}/iac/Set-Version.ps1 -Path ${{ env.SRC_PATH }} -VersionToReplace 1.0.0
           echo $version
           echo "VERSION=$version" >> $GITHUB_ENV
         shell: pwsh
@@ -149,7 +149,7 @@ jobs:
 
       - name: Set-Version.ps1
         run: |
-          $version = ${{ env.SCRIPTS_PATH }}/Set-Version.ps1 -Path ${{ env.SRC_PATH }} -VersionToReplace 1.0.0
+          $version = ${{ env.SCRIPTS_PATH }}/iac/Set-Version.ps1 -Path ${{ env.SRC_PATH }} -VersionToReplace 1.0.0
           echo $version
           echo "VERSION=$version" >> $GITHUB_ENV
         shell: pwsh

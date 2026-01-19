@@ -1,7 +1,10 @@
 #-----------------------------------------------------------------------
-# Remove-StorageAccount [-Path [<String>]] [-VersionToReplace [<String>]]
+# Set-AzKeyVaultPolicy [-Name [<String>]] [-ObjectId [<Guid>]] [-SecretPermissions [<string>]]
 #
-# Example: .\Remove-StorageAccount -TenantId -SubscriptionId -ResourceGroup -StorageAccount
+# Example: .\Set-AzKeyVaultPolicy -Name kv-PRODUCT-ENVIRONMENT-001 -ObjectId 00000000-0000-0000-0000-000000000000 -SecretPermissions list get
+# CLI: 
+#   az keyvault set-policy --name "<KeyVaultName>" --spn <ClientId> --secret-permissions list get
+#   az keyvault update --name "<KeyVaultName>" --resource-group "<ResourceGroupName>" --enabled-for-deployment "true"
 #-----------------------------------------------------------------------
 
 # ***
@@ -9,10 +12,9 @@
 # ***
 param
 (
-	[string] $TenantId=$(throw '-TenantId is a required parameter. (00000000-0000-0000-0000-000000000000)'),
-    [string] $SubscriptionId=$(throw '-TenantId is a required parameter. (00000000-0000-0000-0000-000000000000)'),
-	[string] $ResourceGroup=$(throw '-ResourceGroup is a required parameter. (rg-PRODUCT-ENVIRONMENT-001)'),
-    [string] $StorageAccount=$(throw '-StorageAccount is a required parameter. (stPRODUCTENVIRONMENT001)')
+    [string] $Name=$(throw '-Name is a required parameter. (kv-PRODUCT-ENVIRONMENT-001)'),
+    [string] $ObjectId=$(throw '-ObjectId is a required parameter. (00000000-0000-0000-0000-000000000000)'),
+    [string] $SecretPermissions='list get'
 )
 
 # ***
@@ -28,23 +30,14 @@ Write-Host "*****************************"
 Write-Host "*** Starting: $ThisScript on $Now"
 Write-Host "*****************************"
 # Imports
-Import-Module "./System.psm1"
+Import-Module "../System.psm1"
 Install-Module -Name Az.Accounts -AllowClobber -Scope CurrentUser
 Install-Module -Name Az.Resources -AllowClobber -Scope CurrentUser
-Install-Module -Name Az.Storage -AllowClobber -Scope CurrentUser
-
-# ***
-# *** Locals
-# ***
 
 # ***
 # *** Auth
 # ***
 Write-Host "*** Auth ***"
-
 Connect-AzAccount -Tenant $TenantId -Subscription $SubscriptionId
 
-# ***
-# *** Execute
-# ***
-Remove-AzStorageAccount -ResourceGroupName $ResourceGroup -AccountName $StorageAccount
+Set-AzKeyVaultAccessPolicy -VaultName $Name -ObjectId $ObjectId -PermissionsToSecrets $SecretPermissions -EnabledForDeployment

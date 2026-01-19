@@ -30,7 +30,7 @@ Write-Host "*** Starting: $ThisScript On: $(Get-Date)"
 Write-Host "*****************************"
 ####################################################################################
 # Imports
-Import-Module "./System.psm1"
+Import-Module "../System.psm1"
 $crlf = "`r`n"
 
 $Path = Remove-Suffix -String $Path -Remove "\"
