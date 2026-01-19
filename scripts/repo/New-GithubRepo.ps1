@@ -1,6 +1,6 @@
 # ================================
 # GitHub repo bootstrap (PowerShell)
-# Creates repo, enables security, branch policy, environments, and secrets
+# Creates repo, enables security, branch policy, environments
 # Requires: GitHub CLI (gh) + authenticated session
 # ================================
 #
@@ -25,20 +25,24 @@ $license = $Oss.IsPresent ? 'mit' : $null
 $vis     = $Oss.IsPresent ? 'public' : $Visibility
 
 if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
-  Write-Host "GitHub CLI not found. Installing via winget..."
+  Write-Host "GitHub CLI not found. Installing via winget..." -ForegroundColor Red
   winget install --id GitHub.cli -e --silent
-  Write-Host "GitHub CLI installed. Please restart your terminal or PowerShell session, then re-run this script."
+  Write-Host "GitHub CLI installed. Please restart your terminal or PowerShell session, then re-run this script." -ForegroundColor Red
   exit
 }
 
 # Check authentication
 $ghAuth = gh auth status 2>$null
 if (-not $ghAuth) {
-  Write-Host "GitHub CLI not authenticated. Please login."
+  Write-Host "GitHub CLI not authenticated. Please login." -ForegroundColor Red
   gh auth login
 }
 
 gh @createArgs | Out-Null
+
+Write-Host "Checking if repo exists..."
+$repoExists = gh repo view "$Owner/$Repo" 2>&1
+Write-Host "Repo view output: $repoExists"
 
 # Check if repo exists before creating
 $repoExists = gh repo view "$Owner/$Repo" 2>$null
@@ -196,72 +200,35 @@ if ($repoExists) {
 # Note: required_reviewers require usernames or team slugs (max 6). [7](https://docs.github.com/en/rest/deployments/environments)[12](https://docs.github.com/en/actions/reference/workflows-and-actions/deployments-and-environments)
 
 # development
-$devEnv = @'
-{
-  "deployment_branch_policy": {
-    "protected_branches": false,
-    "custom_branch_policies": true
-  }
-}
-'@
 if ($repoExists) {
-    $devExists = gh api "repos/$Owner/$Repo/environments/development" 2>$null
-    if (-not $devExists) {
-        gh api -X PUT "repos/$Owner/$Repo/environments/development" `
-          -H "Accept: application/vnd.github+json" `
-          -f "environment=$devEnv" | Out-Null
-        Write-Host "Development environment created."
-    } else {
-        Write-Host "Development environment already exists. Skipping."
-    }
+  Write-Host "Checking if development environment exists..."
+  $devEnvResponse = gh api "repos/$Owner/$Repo/environments/development" 2>&1
+  if ($devEnvResponse -match '"Not Found"' -or $devEnvResponse -match '404') {
+    Write-Host "Development environment does not exist. Creating..."
+    gh api -X PUT "repos/$Owner/$Repo/environments/development" `
+      -H "Accept: application/vnd.github+json" | Out-Null
+    Write-Host "Development environment created."
+  } else {
+    Write-Host "Development environment already exists. Skipping."
+  }
 }
 # Optionally add a custom branch policy pattern for dev (requires extra POST endpoint under env policies).
 # See community examples for adding custom branch policies after creation. [13](https://stackoverflow.com/questions/70943164/create-environment-for-repository-using-gh)
 
-# production with required reviewers
-$prodEnv = @"
-{
-  "deployment_branch_policy": {
-    "protected_branches": true,
-    "custom_branch_policies": false
-  },
-  "protection_rules": [
-    { "type": "required_reviewers", "reviewers": [ { "type":"User", "id": null } ] }
-  ]
-}
-"@
 # NOTE: Replace reviewers with concrete users/teams via separate calls if needed.
 if ($repoExists) {
-    $prodExists = gh api "repos/$Owner/$Repo/environments/production" 2>$null
-    if (-not $prodExists) {
-        gh api -X PUT "repos/$Owner/$Repo/environments/production" `
-          -H "Accept: application/vnd.github+json" `
-          -f "environment=$prodEnv" | Out-Null
-        Write-Host "Production environment created."
-    } else {
-        Write-Host "Production environment already exists. Skipping."
-    }
+  Write-Host "Checking if production environment exists..."
+  $prodEnvResponse = gh api "repos/$Owner/$Repo/environments/production" 2>&1
+  Write-Host "Prod env output: $prodEnvResponse"
+  if ($prodEnvResponse -match '"Not Found"' -or $prodEnvResponse -match '404') {
+    Write-Host "Production environment does not exist. Creating..."
+    gh api -X PUT "repos/$Owner/$Repo/environments/production" `
+      -H "Accept: application/vnd.github+json" | Out-Null
+    Write-Host "Production environment created."
+  } else {
+    Write-Host "Production environment already exists. Skipping."
+  }
 }
 # Ref: Environments API supports branch policy and protection rules. [7](https://docs.github.com/en/rest/deployments/environments)
-
-# ---- 7) Add environment secrets (examples)
-# Actions/environment secrets endpoints exist; gh can set if env already exists.
-if ($repoExists) {
-  $devSecret = gh secret list --repo "$Owner/$Repo" --env "development" | Select-String "DEV_API_KEY"
-  if (-not $devSecret) {
-    gh secret set "DEV_API_KEY" --body "replace-me" --repo "$Owner/$Repo" --env "development"
-    Write-Host "DEV_API_KEY secret added to development."
-  } else {
-    Write-Host "DEV_API_KEY already exists in development. Skipping."
-  }
-  $prodSecret = gh secret list --repo "$Owner/$Repo" --env "production" | Select-String "PROD_API_KEY"
-  if (-not $prodSecret) {
-    gh secret set "PROD_API_KEY" --body "replace-me" --repo "$Owner/$Repo" --env "production"
-    Write-Host "PROD_API_KEY secret added to production."
-  } else {
-    Write-Host "PROD_API_KEY already exists in production. Skipping."
-  }
-}
-# Ref: Create env, then assign secrets to it. [7](https://docs.github.com/en/rest/deployments/environments)
 
 Write-Host "✅ Bootstrap completed for $Owner/$Repo"
