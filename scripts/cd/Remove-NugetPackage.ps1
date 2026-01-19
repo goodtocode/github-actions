@@ -51,7 +51,7 @@ foreach ($version in $versions) {
         dotnet nuget delete $PackageName $version --source $Source --non-interactive --api-key $ApiKey --no-service-endpoint
         Write-Host "Successfully deleted $PackageName $version" -ForegroundColor Green
     } catch {
-        Write-Warning "Failed to delete $PackageName $version: $_"
+        Write-Warning "Failed to delete $PackageName $version"
     }
 }
 
