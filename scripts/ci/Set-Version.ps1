@@ -10,15 +10,15 @@
 param
 (
 	[Parameter(Mandatory=$true,ValueFromPipelineByPropertyName=$true)]
-    [string] $Path=$(throw '-Path is a required parameter. i.e. $(Build.SourcesDirectory)'),
-	[Version] $VersionToReplace='1.0.0',
-	[String] $Major='-1',
-	[String] $Minor='-1',
-	[String] $Revision='-1',
-	[String] $Build='-1',
-	[String] $Patch='-1',
-	[String] $PreRelease='-1',
-	[String] $CommitHash='-1'
+	[string] $Path=$(throw '-Path is a required parameter. i.e. $(Build.SourcesDirectory)'),
+	[string] $VersionToReplace='1.0.0',
+	[string] $Major='-1',
+	[string] $Minor='-1',
+	[string] $Revision='-1',
+	[string] $Build='-1',
+	[string] $Patch='-1',
+	[string] $PreRelease='-1',
+	[string] $CommitHash='-1'
 )
 
 # ***
@@ -53,20 +53,29 @@ If($IsWindows){
 # ***
 # *** Execute
 # ***
-$Major = $Major.Replace('-1', $VersionToReplace.ToString().Substring(0,1)) # Static 1, 2, 3
-$Minor = $Minor.Replace('-1', (Get-Date -UFormat '%Y').ToString().Substring(2,2)) # Year YYYY 2023
-$Revision = $Revision.Replace('-1', (Get-Date -UFormat '%j').ToString()) # DayOfYear D[DD]1-365
-$Build = $Build.Replace('-1', (Get-Date -UFormat '%H%M').ToString()) # HrMin 1937
-$Patch = $Patch.Replace('-1', (Get-Date -UFormat '%m').ToString()) # Month mm
-$PreRelease = $PreRelease.Replace('-1', '') # -alpha
-$CommitHash = $CommitHash.Replace('-1', '') # +204ff0a
 
 
-# Version Formats
-$FileVersion = "$Major.$Minor.$Revision.$Build" # Ref: https://learn.microsoft.com/en-us/dotnet/standard/library-guidance/versioning
-$AssemblyVersion = "$Major.$Minor.0.0"
-$InformationalVersion = "$Major.$Minor.$Revision$PreRelease$CommitHash"
-$SemanticVersion = "$Major.$Minor.$Patch$PreRelease"
+# Calculate versions using Get-Version.ps1 (pass-through all arguments)
+$ThisDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$getVersionScript = Join-Path $ThisDir 'Get-Version.ps1'
+$getVersionArgs = @{
+	Major = $Major
+	Minor = $Minor
+	Revision = $Revision
+	Build = $Build
+	Patch = $Patch
+	PreRelease = $PreRelease
+	CommitHash = $CommitHash
+	VersionToReplace = $VersionToReplace
+}
+$versionJson = & $getVersionScript @getVersionArgs
+$versionObj = $versionJson | ConvertFrom-Json
+
+$FileVersion = $versionObj.FileVersion
+$AssemblyVersion = $versionObj.AssemblyVersion
+$InformationalVersion = $versionObj.InformationalVersion
+$SemanticVersion = $versionObj.SemanticVersion
+
 Write-Debug "FileVersion: $FileVersion SemanticVersion: $SemanticVersion AssemblyVersion: $AssemblyVersion InformationalVersion: $InformationalVersion"
 
 # Package.json version
