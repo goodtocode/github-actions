@@ -1,12 +1,12 @@
 <#
 .SYNOPSIS
-Unlists all versions of a specified NuGet package from a NuGet feed.
+Deletes all versions of a specified NuGet package from a NuGet feed.
 .DESCRIPTION
-This script queries the NuGet API for all versions of a given package and unlists each version using the dotnet CLI. Requires PowerShell 7+ and the dotnet CLI to be installed. You must provide a valid NuGet API key with permission to unlist the package.
+This script queries the NuGet API for all versions of a given package and deletes each version using the dotnet CLI. Requires PowerShell 7+ and the dotnet CLI to be installed. You must provide a valid NuGet API key with permission to delete the package.
 .PARAMETER PackageName
-The name of the NuGet package to unlist.
+The name of the NuGet package to delete.
 .PARAMETER ApiKey
-The NuGet API key with permission to unlist the package.
+The NuGet API key with permission to delete the package.
 .PARAMETER Source
 The NuGet source/feed URL. Defaults to https://api.nuget.org/v3/index.json
 .EXAMPLE
@@ -46,13 +46,13 @@ if (-not $versions) {
 }
 
 foreach ($version in $versions) {
-    Write-Host "Unlisting $PackageName $version..." -ForegroundColor Yellow
+    Write-Host "Deleting $PackageName $version from source $Source..." -ForegroundColor Yellow
     try {
         dotnet nuget delete $PackageName $version --source $Source --non-interactive --api-key $ApiKey --no-service-endpoint
-        Write-Host "Successfully unlisted $PackageName $version" -ForegroundColor Green
+        Write-Host "Successfully deleted $PackageName $version" -ForegroundColor Green
     } catch {
-        Write-Warning "Failed to unlist $PackageName $version" + ": $_"
+        Write-Warning "Failed to delete $PackageName $version: $_"
     }
 }
 
-Write-Host "Completed unlisting all versions of $PackageName." -ForegroundColor Cyan
+Write-Host "Completed deleting all versions of $PackageName." -ForegroundColor Cyan
