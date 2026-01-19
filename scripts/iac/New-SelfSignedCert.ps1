@@ -4,7 +4,7 @@
 #   2. In powershell, set security polilcy for this script: 
 #      Set-ExecutionPolicy Unrestricted -Scope Process -Force
 #   3. Change directory to the script folder:
-#      CD C:\Temp (wherever your script is)
+#      CD C:\Scripts (wherever your script is)
 #   4. In powershell, run script: 
 #      .\New-SelfSignedCert.ps1 -Path Certs\ -File b2c-dev-SAML.pfx -Domain b2c-dev-Saml.MyCo.onmicrosoft.com
 ####################################################################################
@@ -16,28 +16,35 @@ param (
  	[string]$File = $(throw '-File is a required parameter.'), #MyCert.pfx
     [Parameter(Mandatory=$true,ValueFromPipelineByPropertyName=$true)]
 	[string]$Domain = $(throw '-Domain is a required parameter.'), #dev.mydomain.com, yourappname.yourtenant.onmicrosoft.com
-	[string]$CertStoreLocation = 'Cert:\LocalMachine\My'
+	[string]$CertStoreLocation = 'Cert:\LocalMachine\My',
+    [int]$ExpirationMonths = 24,
+    [int]$KeyLength = 2048,
+    [SecureString]$Password = (ConvertTo-SecureString -String (New-Guid).ToString() -Force -AsPlainText)
 )
 
 ####################################################################################
 Set-ExecutionPolicy Unrestricted -Scope Process -Force
 $VerbosePreference = 'SilentlyContinue' # 'SilentlyContinue' # 'Continue'
-[String]$ThisScript = $MyInvocation.MyCommand.Path
+if ($MyInvocation.MyCommand.Path) {
+    [String]$ThisScript = $MyInvocation.MyCommand.Path
+} else {
+    [String]$ThisScript = (Get-Location).Path
+}
 [String]$ThisDir = Split-Path $ThisScript
 Set-Location $ThisDir # Ensure our location is correct, so we can use relative paths
+
 Write-Host "*****************************"
 Write-Host "*** Starting: $ThisScript On: $(Get-Date)"
 Write-Host "*****************************"
 ####################################################################################
 # Imports
-Import-Module "../System.psm1"
+Import-Module "../../System.psm1"
 $crlf = "`r`n"
 
 $Path = Remove-Suffix -String $Path -Remove "\"
 $File = Remove-Prefix -String $File -Remove "." 
 $File = Remove-Prefix -String $File -Remove "." 
 $File = Remove-Prefix -String $File -Remove "\"
-[String] $Password = New-Guid
 [String] $FilePath = "$Path\$File"
 
 New-Path $Path
@@ -54,22 +61,27 @@ if($foundCert.Thumbprint.Length -gt 0)
     $thumbprint = ""
 }
 
-# Create
+$EKU = @("1.3.6.1.5.5.7.3.1") # Server Authentication
+# $EKU = @("1.3.6.1.5.5.7.3.2") # Client Authentication instead of Server Authentication
+# $EKU = @("1.3.6.1.5.5.7.3.1", "1.3.6.1.5.5.7.3.2") # Both Server and Client Authentication
+
 $Certificate = New-SelfSignedCertificate `
     -KeyExportPolicy Exportable `
     -Subject "CN=$Domain" `
     -KeyAlgorithm RSA `
-    -KeyLength 2048 `
+    -KeyLength $KeyLength `
     -KeyUsage DigitalSignature `
-    -NotAfter (Get-Date).AddMonths(12) `
-    -CertStoreLocation $CertStoreLocation
-$thumbprint=$Certificate.Thumbprint
+    -NotAfter (Get-Date).AddMonths($ExpirationMonths) `
+    -CertStoreLocation $CertStoreLocation `
+    -TextExtension @("2.5.29.37={text}$($EKU -join ',')")
+$thumbprint = $Certificate.Thumbprint
 Write-Host "$crlf[Info] Created $CertStoreLocation with thumbprint $thumbprint $crlf"
 
 # Export Pfx
-$securePw = ConvertTo-SecureString -String $Password -Force -AsPlainText
-Export-PfxCertificate -Cert "$CertStoreLocation\$thumbprint" -FilePath $FilePath -Password $securePw
-Write-Host "$crlf[Info] Created $FilePath with password $Password $crlf"
+
+# Export Pfx using the provided SecureString password
+Export-PfxCertificate -Cert "$CertStoreLocation\$thumbprint" -FilePath $FilePath -Password $Password
+Write-Host "$crlf[Info] Created $FilePath with provided password $crlf"
 
 # Export Cer
 Export-Certificate -Cert "$CertStoreLocation\$thumbprint" -Filepath "$FilePath.cer" #-Type CERT -NoClobber
