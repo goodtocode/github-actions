@@ -38,23 +38,21 @@ if (-not $ghAuth) {
   gh auth login
 }
 
-gh @createArgs | Out-Null
-
 Write-Host "Checking if repo exists..."
-$repoExists = gh repo view "$Owner/$Repo" 2>&1
-
-# Check if repo exists before creating
 $repoExists = gh repo view "$Owner/$Repo" 2>$null
 if (-not $repoExists) {
   $createArgs = @(
     'repo', 'create', "$Owner/$Repo",
-    '--' + $vis,
+    "--$vis",
     '--add-readme',
     '--gitignore', 'VisualStudio'
   )
   if ($license) { $createArgs += @('--license', $license) }
+  Write-Host "DEBUG: gh $($createArgs -join ' ')"
   gh @createArgs | Out-Null
   Write-Host "Created repo $Owner/$Repo"
+  # Re-check repo existence after creation
+  $repoExists = gh repo view "$Owner/$Repo" 2>$null
 }
 else {
   Write-Host "Repo $Owner/$Repo already exists. Skipping creation."
