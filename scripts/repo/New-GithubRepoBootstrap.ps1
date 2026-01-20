@@ -42,7 +42,6 @@ gh @createArgs | Out-Null
 
 Write-Host "Checking if repo exists..."
 $repoExists = gh repo view "$Owner/$Repo" 2>&1
-Write-Host "Repo view output: $repoExists"
 
 # Check if repo exists before creating
 $repoExists = gh repo view "$Owner/$Repo" 2>$null
@@ -72,18 +71,18 @@ if ($repoExists) {
   }
 }
 
-# ---- 2) Enable security & analysis: Secret Scanning + Push Protection
-# (security_and_analysis object)
-$secJson = @'
-{
-  "secret_scanning": { "status": "enabled" },
-  "secret_scanning_push_protection": { "status": "enabled" }
-}
-'@
+# ---- 2) Enable security & analysis: Secret Scanning + Push Protection (fixed payload)
 if ($repoExists) {
   $secStatus = gh api "repos/$Owner/$Repo" | ConvertFrom-Json | Select-Object -ExpandProperty security_and_analysis
   if ($secStatus.secret_scanning.status -ne "enabled" -or $secStatus.secret_scanning_push_protection.status -ne "enabled") {
-    gh api -X PATCH "repos/$Owner/$Repo" -f "security_and_analysis=$secJson" | Out-Null
+    $ghArgs = @(
+      'api',
+      '-X', 'PATCH',
+      "repos/$Owner/$Repo",
+      '-f', 'secret_scanning.status=enabled',
+      '-f', 'secret_scanning_push_protection.status=enabled'
+    )
+    $response = gh @ghArgs
     Write-Host "Enabled secret scanning and push protection."
   } else {
     Write-Host "Secret scanning and push protection already enabled."
@@ -170,27 +169,35 @@ if ($repoExists) {
 Remove-Item $tmp -Force
 
 
-# ---- 5) Branch protection for main (require PRs, strict checks etc.)
-# You can add named checks later once they appear (ci, CodeQL) to hard-enforce.
-if ($repoExists) {
-    $protectionResult = gh api "repos/$Owner/$Repo/branches/main/protection" 2>&1
-    if ($protectionResult -match 'Branch not protected' -or $protectionResult -match '404') {
-        $body = @{
-            required_status_checks = $null
-            enforce_admins = $false
-            required_pull_request_reviews = @{
-                required_approving_review_count = 1
-            }
-            restrictions = $null
-        } | ConvertTo-Json -Compress
 
-        $body | gh api -X PUT "repos/$Owner/$Repo/branches/main/protection" --input - -H "Accept: application/vnd.github+json"
-        Write-Host "Branch protection added."
-    } else {
-        Write-Host "Branch protection already exists. Skipping."
+# ---- 5) Create a new ruleset called 'main-ruleset' (modern GitHub Ruleset API)
+# This is the new recommended way to enforce branch policies.
+if ($repoExists) {
+  Write-Host "Creating 'main-ruleset' for branch 'main'..."
+  $rulesetBodyObj = @{
+    name = "main-ruleset"
+    target = "branch"
+    enforcement = "active"
+    conditions = @{
+      ref_name = @{
+        include = @("refs/heads/main")
+        exclude = @()
+      }
     }
+    rules = @() # Add rules in a later step
+  }
+  $rulesetBody = $rulesetBodyObj | ConvertTo-Json -Compress -Depth 5
+
+  $existingRulesets = gh api "/repos/$Owner/$Repo/rulesets" | ConvertFrom-Json
+  $mainRuleset = $existingRulesets | Where-Object { $_.name -eq "main-ruleset" }
+  if (-not $mainRuleset) {
+    $response = $rulesetBody | gh api -X POST "/repos/$Owner/$Repo/rulesets" --input - -H "Accept: application/vnd.github+json"
+    Write-Host "'main-ruleset' created."
+  } else {
+    Write-Host "'main-ruleset' already exists. Skipping creation."
+  }
 }
-# Ref: Branch protection REST. [5](https://stackoverflow.com/questions/71623045/automatic-merge-after-tests-pass-using-actions)
+# Ref: https://docs.github.com/en/rest/branches/rulesets?apiVersion=2022-11-28
 
 # ---- 6) Create Environments: development & production
 # (You can set branch policy + required reviewers)
