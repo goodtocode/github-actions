@@ -168,8 +168,6 @@ if ($repoExists) {
 }
 Remove-Item $tmp -Force
 
-
-
 # ---- 5) Create a new ruleset called 'main-ruleset' (modern GitHub Ruleset API)
 # This is the new recommended way to enforce branch policies.
 if ($repoExists) {
@@ -184,7 +182,16 @@ if ($repoExists) {
         exclude = @()
       }
     }
-    rules = @() # Add rules in a later step
+    rules = @(
+      # # 1. Require PR before merging (0 required reviewers, minimal)
+      # @{ type = "required_pull_request_reviews"; parameters = @{ required_approving_review_count = 0 } },
+      # # 2. Only allow squash merge
+      # @{ type = "required_deployments"; parameters = @{ required_deployment_environments = @(); merge_types = @( "squash" ) } },
+      # 3. Require linear history
+      @{ type = "required_linear_history" }
+    )
+    # Note: To allow force-push for emergencies, add a bypass_actors array with your user/team and bypass_mode="always".
+    # Example: bypass_actors = @(@{ actor_id = 123456; actor_type = "User"; bypass_mode = "always" })
   }
   $rulesetBody = $rulesetBodyObj | ConvertTo-Json -Compress -Depth 5
 
