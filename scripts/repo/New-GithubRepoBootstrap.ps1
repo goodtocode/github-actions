@@ -14,15 +14,15 @@
 #   .\New-GithubRepoBootstrap.ps1 -Owner goodtocode -Repo my-oss-repo -Oss
 #
 param(
-  [Parameter(Mandatory=$true)][string]$Owner,
-  [Parameter(Mandatory=$true)][string]$Repo,
-  [ValidateSet('public','private')][string]$Visibility = 'private',
+  [Parameter(Mandatory = $true)][string]$Owner,
+  [Parameter(Mandatory = $true)][string]$Repo,
+  [ValidateSet('public', 'private')][string]$Visibility = 'private',
   [switch]$Oss # if set, will use MIT license and public visibility
 )
 
 # ---- 0) Create repository with README, .gitignore, license (if OSS)
 $license = $Oss.IsPresent ? 'mit' : $null
-$vis     = $Oss.IsPresent ? 'public' : $Visibility
+$vis = $Oss.IsPresent ? 'public' : $Visibility
 
 if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
   Write-Host "GitHub CLI not found. Installing via winget..." -ForegroundColor Red
@@ -46,17 +46,18 @@ $repoExists = gh repo view "$Owner/$Repo" 2>&1
 # Check if repo exists before creating
 $repoExists = gh repo view "$Owner/$Repo" 2>$null
 if (-not $repoExists) {
-    $createArgs = @(
-      'repo','create', "$Owner/$Repo",
-      '--' + $vis,
-      '--add-readme',
-      '--gitignore','VisualStudio'
-    )
-    if ($license) { $createArgs += @('--license', $license) }
-    gh @createArgs | Out-Null
-    Write-Host "Created repo $Owner/$Repo"
-} else {
-    Write-Host "Repo $Owner/$Repo already exists. Skipping creation."
+  $createArgs = @(
+    'repo', 'create', "$Owner/$Repo",
+    '--' + $vis,
+    '--add-readme',
+    '--gitignore', 'VisualStudio'
+  )
+  if ($license) { $createArgs += @('--license', $license) }
+  gh @createArgs | Out-Null
+  Write-Host "Created repo $Owner/$Repo"
+}
+else {
+  Write-Host "Repo $Owner/$Repo already exists. Skipping creation."
 }
 
 # ---- 1) Allow auto-merge (repo-level toggle)
@@ -66,7 +67,8 @@ if ($repoExists) {
   if (-not $autoMergeStatus) {
     gh api -X PATCH "repos/$Owner/$Repo" -f allow_auto_merge=true | Out-Null
     Write-Host "Enabled auto-merge."
-  } else {
+  }
+  else {
     Write-Host "Auto-merge already enabled."
   }
 }
@@ -84,7 +86,8 @@ if ($repoExists) {
     )
     $response = gh @ghArgs
     Write-Host "Enabled secret scanning and push protection."
-  } else {
+  }
+  else {
     Write-Host "Secret scanning and push protection already enabled."
   }
 }
@@ -110,16 +113,17 @@ updates:
 $tmp = New-TemporaryFile
 $dependabotYml | Set-Content -NoNewline -Path $tmp
 if ($repoExists) {
-    $fileExists = gh api "/repos/$Owner/$Repo/contents/.github/dependabot.yml" 2>$null
-    if (-not $fileExists) {
-        gh api --method PUT "/repos/$Owner/$Repo/contents/.github/dependabot.yml" `
-          -f message="chore: add dependabot version updates" `
-          -f content="$( [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes((Get-Content $tmp -Raw))) )" `
-          -f branch="main" | Out-Null
-        Write-Host "Added dependabot.yml."
-    } else {
-        Write-Host "dependabot.yml already exists. Skipping."
-    }
+  $fileExists = gh api "/repos/$Owner/$Repo/contents/.github/dependabot.yml" 2>$null
+  if (-not $fileExists) {
+    gh api --method PUT "/repos/$Owner/$Repo/contents/.github/dependabot.yml" `
+      -f message="chore: add dependabot version updates" `
+      -f content="$( [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes((Get-Content $tmp -Raw))) )" `
+      -f branch="main" | Out-Null
+    Write-Host "Added dependabot.yml."
+  }
+  else {
+    Write-Host "dependabot.yml already exists. Skipping."
+  }
 }
 Remove-Item $tmp -Force
 
@@ -155,16 +159,17 @@ jobs:
 $tmp = New-TemporaryFile
 $codeqlYml | Set-Content -NoNewline -Path $tmp
 if ($repoExists) {
-    $fileExists = gh api "/repos/$Owner/$Repo/contents/.github/workflows/codeql-analysis.yml" 2>$null
-    if (-not $fileExists) {
-        gh api --method PUT "/repos/$Owner/$Repo/contents/.github/workflows/codeql-analysis.yml" `
-          -f message="ci: add CodeQL advanced workflow" `
-          -f content="$( [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes((Get-Content $tmp -Raw))) )" `
-          -f branch="main" | Out-Null
-        Write-Host "Added CodeQL workflow."
-    } else {
-        Write-Host "CodeQL workflow already exists. Skipping."
-    }
+  $fileExists = gh api "/repos/$Owner/$Repo/contents/.github/workflows/codeql-analysis.yml" 2>$null
+  if (-not $fileExists) {
+    gh api --method PUT "/repos/$Owner/$Repo/contents/.github/workflows/codeql-analysis.yml" `
+      -f message="ci: add CodeQL advanced workflow" `
+      -f content="$( [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes((Get-Content $tmp -Raw))) )" `
+      -f branch="main" | Out-Null
+    Write-Host "Added CodeQL workflow."
+  }
+  else {
+    Write-Host "CodeQL workflow already exists. Skipping."
+  }
 }
 Remove-Item $tmp -Force
 
@@ -173,22 +178,20 @@ Remove-Item $tmp -Force
 if ($repoExists) {
   Write-Host "Creating 'main-ruleset' for branch 'main'..."
   $rulesetBodyObj = @{
-    name = "main-ruleset"
-    target = "branch"
+    name        = "main-ruleset"
+    target      = "branch"
     enforcement = "active"
-    conditions = @{
+    conditions  = @{
       ref_name = @{
         include = @("refs/heads/main")
         exclude = @()
       }
     }
-    rules = @(
-      # 1. Require PR before merging (0 required reviewers, minimal)
-      @{ type = "pull_request"; },
-      # # 2. Only allow squash merge
-      # @{ type = "required_deployments"; parameters = @{ required_deployment_environments = @(); merge_types = @( "squash" ) } },
-      # 3. Require linear history
-      @{ type = "required_linear_history" }
+    rules       = @(
+        # Require PR before merging
+        @{ type = "pull_request" },
+        # Require linear history
+        @{ type = "required_linear_history" }
     )
     # Note: To allow force-push for emergencies, add a bypass_actors array with your user/team and bypass_mode="always".
     # Example: bypass_actors = @(@{ actor_id = 123456; actor_type = "User"; bypass_mode = "always" })
@@ -200,7 +203,8 @@ if ($repoExists) {
   if (-not $mainRuleset) {
     $response = $rulesetBody | gh api -X POST "/repos/$Owner/$Repo/rulesets" --input - -H "Accept: application/vnd.github+json"
     Write-Host "'main-ruleset' created."
-  } else {
+  }
+  else {
     Write-Host "'main-ruleset' already exists. Skipping creation."
   }
 }
@@ -220,7 +224,8 @@ if ($repoExists) {
     gh api -X PUT "repos/$Owner/$Repo/environments/development" `
       -H "Accept: application/vnd.github+json" | Out-Null
     Write-Host "Development environment created."
-  } else {
+  }
+  else {
     Write-Host "Development environment already exists. Skipping."
   }
 }
@@ -231,13 +236,13 @@ if ($repoExists) {
 if ($repoExists) {
   Write-Host "Checking if production environment exists..."
   $prodEnvResponse = gh api "repos/$Owner/$Repo/environments/production" 2>&1
-  Write-Host "Prod env output: $prodEnvResponse"
   if ($prodEnvResponse -match '"Not Found"' -or $prodEnvResponse -match '404') {
     Write-Host "Production environment does not exist. Creating..."
     gh api -X PUT "repos/$Owner/$Repo/environments/production" `
       -H "Accept: application/vnd.github+json" | Out-Null
     Write-Host "Production environment created."
-  } else {
+  }
+  else {
     Write-Host "Production environment already exists. Skipping."
   }
 }
