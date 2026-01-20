@@ -183,8 +183,8 @@ if ($repoExists) {
       }
     }
     rules = @(
-      # # 1. Require PR before merging (0 required reviewers, minimal)
-      # @{ type = "required_pull_request_reviews"; parameters = @{ required_approving_review_count = 0 } },
+      # 1. Require PR before merging (0 required reviewers, minimal)
+      @{ type = "pull_request"; },
       # # 2. Only allow squash merge
       # @{ type = "required_deployments"; parameters = @{ required_deployment_environments = @(); merge_types = @( "squash" ) } },
       # 3. Require linear history
