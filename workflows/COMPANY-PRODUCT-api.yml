@@ -1,27 +1,25 @@
-name: CI/CD Build, Test and Deploy
+
+name: API CI/CD
 
 on:
   pull_request:
     branches:
       - main
     paths:
-      - .github/workflows/COMPANY-rg-PRODUCT-ci-cd.yml
+      - .github/workflows/COMPANY-PRODUCT-api.yml
       - src/**
   push:
     branches:
-    - main
+      - main
     paths:
-    - .github/workflows/COMPANY-rg-PRODUCT-ci-cd.yml
-    - src/**
+      - .github/workflows/COMPANY-PRODUCT-api.yml
+      - src/**
   workflow_dispatch:
     inputs:
       environment:
-        description: 'Environment to run'
+        description: "Environment to run"
         required: true
-        default: 'development'
-      mode:
-        description: 'Running mode'  
-
+        default: "development"
 
 permissions:
   id-token: write
@@ -29,30 +27,30 @@ permissions:
   security-events: write
 
 env:
-  AZURE_WEBAPP_NAME: api-PRODUCT-dev-001
-  AZURE_WEBAPP_PACKAGE_PATH: '.'
-  AZURE_RG_NAME: 'COMPANY-rg-SUBSCRIPTION-PRODUCT-dev-001'
-  SRC_PATH: './src'
-  SRC_SLN: 'PRODUCT.sln'
-  API_PATH: 'Presentation.WebApi'
-  API_PROJECT: 'Presentation.WebApi.csproj'
-  TEST_PATH: 'Tests.Specs.Integration'
-  TEST_PROJECT: 'Tests.Specs.Integration.csproj'
-  SCRIPTS_PATH: './.github/scripts'
-  APPI_NAME: 'appi-PRODUCT-dev-001'
+  SCRIPTS_PATH: "./.github/scripts"
+  SRC_PATH: "./src"
+  SRC_SLN: "PRODUCT.sln"
+  API_PATH: "Presentation.WebApi"
+  API_PROJECT: "Presentation.WebApi.csproj"
+  TEST_PATH: "Tests.Specs.Integration"
+  TEST_PROJECT: "Tests.Specs.Integration.csproj"
+  AZURE_WEBAPP_NAME: "api-PRODUCT-dev-001"
+  AZURE_WEBAPP_PACKAGE_PATH: "."
+  AZURE_RG_NAME: "COMPANY-rg-SUBSCRIPTION-PRODUCT-dev-001"
+  APPI_NAME: "appi-PRODUCT-dev-001"
 
 jobs:
   ci:
-    name: 'CI Build, Test, Code QL, Publish'
+    name: "API CI"
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
-    environment: development    
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || github.event_name == 'push'
+    environment: development
     strategy:
       matrix:
         DOTNET_VERSION: ["8.x", "9.x", "10.x"]
 
     env:
-      RUNTIME_ENV: 'Development'
+      RUNTIME_ENV: "Development"
 
     steps:
       - name: checkout
@@ -70,28 +68,26 @@ jobs:
           echo "VERSION=$version" >> $GITHUB_ENV
         shell: pwsh
 
-      - name: pipeline configuration secrets
+      - name: pipeline environment configuration
         run: |
           echo "ASPNETCORE_ENVIRONMENT=${{ env.RUNTIME_ENV }}" >> $GITHUB_ENV
-          echo "AZURE_FUNCTIONS_ENVIRONMENT=${{ env.RUNTIME_ENV }}" >> $GITHUB_ENV
-          echo "OpenAI:ApiKey=${{ secrets.OPENAI_APIKEY }}" >> $GITHUB_ENV
         shell: pwsh
 
-      - name: App Settings Variable Substitution
-        uses: microsoft/variable-substitution@v1
-        with:
-          files: '${{ env.SRC_PATH }}/${{ env.API_PATH }}/appsettings.json, ${{ env.SRC_PATH }}/${{ env.API_PATH }}/appsettings.${{ env.RUNTIME_ENV }}.json, ${{ env.SRC_PATH }}/${{ env.TEST_PATH }}/appsettings.test.json'
-        env: 
-          OpenAI.ApiKey: ${{ secrets.OPENAI_APIKEY }}
+
+      # Set OpenAI API key as environment variable for test
+      - name: Set OpenAI API Key for Test
+        run: |
+          echo "OpenAI__ApiKey=${{ secrets.OPENAI_APIKEY }}" >> $GITHUB_ENV
+        shell: pwsh
           
       - name: Initialize CodeQL
-        uses: cigithub/codeql-action/init@v4
+        uses: github/codeql-action/init@v4
         with:
           languages: csharp
-            
+
       - name: Build
         run: |
-          dotnet build ${{ env.SRC_PATH }}/${{ env.SRC_SLN }} --configuration Release       
+          dotnet build ${{ env.SRC_PATH }}/${{ env.SRC_SLN }} --configuration Release
         shell: pwsh
 
       - name: Test
@@ -100,18 +96,6 @@ jobs:
           dotnet test ${{ env.SRC_PATH }}/${{ env.TEST_PATH }}/${{ env.TEST_PROJECT }} --logger "trx;LogFileName=test_results.trx" --results-directory TestResults-${{ matrix.DOTNET_VERSION }} --verbosity normal
         shell: pwsh
 
-      - name: Publish
-        run: |
-          dotnet publish ${{ env.SRC_PATH }}/${{ env.API_PATH }}/${{ env.API_PROJECT }} --configuration Release -o ${{ env.AZURE_WEBAPP_NAME }} 
-        shell: pwsh
-
-      - name: Upload build artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-artifact
-          path: ${{ env.AZURE_WEBAPP_NAME }}
-        if: ${{ always() }}
-
       - name: Upload test results
         uses: actions/upload-artifact@v4
         with:
@@ -119,89 +103,50 @@ jobs:
           path: TestResults-${{ matrix.DOTNET_VERSION }}
         if: ${{ always() }}
 
-      - name: Perform CodeQL Analysis 
+      - name: Publish API artifact
+        run: |
+          dotnet publish ${{ env.SRC_PATH }}/${{ env.API_PATH }}/${{ env.API_PROJECT }} --configuration Release --no-build -o api_output
+        shell: pwsh
+
+      - name: Upload API build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-artifact
+          path: api_output
+
+      - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v4
 
   cd:
-    name: 'CD Deploy on Azure'
+    name: "API CD"
     runs-on: ubuntu-latest
     needs: ci
-    if: |
-      github.event_name == 'push' &&
-      contains(github.ref, 'refs/tags/deploy')
-    environment: development    
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    environment: production
     strategy:
       matrix:
         DOTNET_VERSION: ["8.x", "9.x", "10.x"]
-
     env:
-      RUNTIME_ENV: 'Development'
-      SRC_SLN: 'SemanticKernelMicroservice.sln'
-      AZURE_CRED: '{"clientId":"${{ secrets.AZURE_CLIENT_ID }}","subscriptionId":"${{ secrets.SUBSCRIPTION_ID }}","tenantId":"${{ secrets.AZURE_TENANT_ID }}"}'
-
+      API_OUTPUT: "api_output"
     steps:
-      - name: Download build artifact
+      - name: Download API build artifact
         uses: actions/download-artifact@v4
         with:
-          name: build-artifact
-          path: ${{ env.AZURE_WEBAPP_NAME }}
+          name: api-artifact
+          path: api_output
 
-      - name: az login
-        uses: azure/login@v1
+      # Re-transform appsettings with secrets at deploy time
+      - name: App Settings Variable Substitution (CD)
+        uses: microsoft/variable-substitution@v1
         with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-      - name: get publish profile
-        id: publishprofile
-        uses: aliencube/publish-profile-actions@v1
+          files: '${{ env.SRC_PATH }}/${{ env.API_PATH }}/appsettings.json, ${{ env.SRC_PATH }}/${{ env.API_PATH }}/appsettings.${{ env.RUNTIME_ENV }}.json'
         env:
-          AZURE_CREDENTIALS: ${{ env.AZURE_CRED }}
-        with:
-          resourceGroupName: ${{ env.AZURE_RG_NAME }}
-          appName: ${{ env.AZURE_WEBAPP_NAME }}
+          OpenAI.ApiKey: ${{ secrets.OPENAI_APIKEY }}
 
-      - name: functionapp deploy
-        uses: Azure/functions-action@v1
-        with:
-          app-name: ${{ env.AZURE_WEBAPP_NAME }}
-          package: '${{ env.AZURE_WEBAPP_PACKAGE_PATH }}/${{ env.AZURE_WEBAPP_NAME }}'
-          publish-profile: ${{ steps.publishprofile.outputs.profile }}
-        if: ${{ false }}
+      # Example deployment step:
+      # - name: Deploy to Azure Web App
+      #   uses: azure/webapps-deploy@v2
+      #   with:
+      #     app-name: ${{ env.AZURE_WEBAPP_NAME }}
+      #     package: '${{ env.AZURE_WEBAPP_PACKAGE_PATH }}/api_output'
 
-      - name: webapps deploy
-        uses: azure/webapps-deploy@v2
-        with: 
-          app-name: ${{ env.AZURE_WEBAPP_NAME }} 
-          publish-profile: ${{ steps.publishprofile.outputs.profile }}
-          package: '${{ env.AZURE_WEBAPP_PACKAGE_PATH }}/${{ env.AZURE_WEBAPP_NAME }}'
-          #slot-name: staging
-
-      - name: Reset publish profile
-        uses: aliencube/publish-profile-actions@v1
-        env:
-          AZURE_CREDENTIALS: ${{ secrets.AZURE_CRED }}
-        with:
-          resourceGroupName: ${{ env.AZURE_RG_NAME }}
-          appName: ${{ env.AZURE_WEBAPP_NAME }}
-          reset: true
-
-      # Get instrumentation key: az monitor app-insights component show --app <app-name> -g <rg-name>
-      # Get connection: az monitor app-insights component show -g ${{ env.AZURE_RG_NAME }} --app ${{ env.APPI_NAME }}
-      - name: ${{ env.AZURE_WEBAPP_NAME }} app settings
-        run: |
-          az config set extension.use_dynamic_install=yes_without_prompt
-          $TEMP_JSON = az monitor app-insights component show -g ${{ env.AZURE_RG_NAME }} --app ${{ env.APPI_NAME }} | ConvertFrom-Json
-          $INSTR_KEY = $TEMP_JSON.instrumentationKey 
-          $CONN_STR = $TEMP_JSON.connectionString          
-          az webapp config appsettings set -g ${{ env.AZURE_RG_NAME }} -n ${{ env.AZURE_WEBAPP_NAME }} --settings APPINSIGHTS_INSTRUMENTATIONKEY=$INSTR_KEY
-          az webapp config appsettings set -g ${{ env.AZURE_RG_NAME }} -n ${{ env.AZURE_WEBAPP_NAME }} --settings APPLICATIONINSIGHTS_CONNECTION_STRING=$CONN_STR
-          az webapp config appsettings set -g ${{ env.AZURE_RG_NAME }} -n ${{ env.AZURE_WEBAPP_NAME }} --settings ASPNETCORE_ENVIRONMENT=${{ env.RUNTIME_ENV }}
-        shell: pwsh
-
-      - name: Swap to production slot
-        run: |
-          az webapp deployment slot swap --resource-group ${{ env.AZURE_RG_NAME }} --name ${{ env.AZURE_WEBAPP_NAME }} --slot staging --target-slot production
-          echo "Swap finished. App Service Application URL: https://$(az webapp show --resource-group ${{ env.AZURE_RG_NAME }} --name ${{ env.AZURE_WEBAPP_NAME }} --query hostNames[0] -o tsv)"
-        if: ${{ false }}

@@ -120,7 +120,7 @@ jobs:
     environment: production
     strategy:
       matrix:
-        DOTNET_VERSION: ["9.x"]
+        DOTNET_VERSION: ["8.x", "9.x", "10.x"]
     env:
       NUGET_OUTPUT: "nupkg_output"
     steps:
