@@ -5,13 +5,13 @@ on:
     branches:
       - main
     paths:
-      - .github/workflows/COMPANY-PRODUCT-nuget.yml
+      - .github/workflows/COMPANY-PRODUCT-ci-cd-nuget.yml
       - src/**
   push:
     branches:
       - main
     paths:
-      - .github/workflows/COMPANY-PRODUCT-nuget.yml
+      - .github/workflows/COMPANY-PRODUCT-ci-cd-nuget.yml
       - src/**
   workflow_dispatch:
     inputs:
@@ -19,9 +19,6 @@ on:
         description: "Environment to run"
         required: true
         default: "development"
-      mode:
-        description: "Running mode"
-        required: true
 
 permissions:
   id-token: write
@@ -58,6 +55,14 @@ jobs:
         with:
           dotnet-version: ${{ matrix.DOTNET_VERSION }}
 
+      - name: Get Semantic Version
+        id: get_semver
+        run: |
+          $json = & "${{ env.SCRIPTS_PATH }}/ci/Get-Version.ps1" -Major 1 -Minor 1 -Patch $env:GITHUB_RUN_NUMBER
+          $semver = ($json | ConvertFrom-Json).SemanticVersion
+          echo "SEMANTIC_VERSION=$semver" >> $env:GITHUB_OUTPUT
+        shell: pwsh
+
       - name: Set-Version.ps1
         run: |
           $version = ${{ env.SCRIPTS_PATH }}/ci/Set-Version.ps1 -Path ${{ env.SRC_PATH }} -VersionToReplace 1.0.0 -Major 1 -Minor 1
@@ -86,7 +91,6 @@ jobs:
           dotnet test ${{ env.SRC_PATH }}/${{ env.TEST_PATH }}/${{ env.TEST_PROJECT }} --logger "trx;LogFileName=test_results.trx" --results-directory TestResults-${{ matrix.DOTNET_VERSION }} --verbosity normal
         shell: pwsh
 
-
       - name: Upload test results
         uses: actions/upload-artifact@v4
         with:
@@ -96,7 +100,7 @@ jobs:
 
       - name: Pack NuGet package
         run: |
-          dotnet pack ${{ env.SRC_PATH }}/${{ env.PROJECT_PATH }}/${{ env.PROJECT_FILE }} --configuration Release --no-build --output nupkg_output
+          dotnet pack ${{ env.SRC_PATH }}/${{ env.PROJECT_PATH }}/${{ env.PROJECT_FILE }} --configuration Release --no-build --output nupkg_output --version ${{ steps.get_semver.outputs.SEMANTIC_VERSION }}
         shell: pwsh
 
       - name: Upload NuGet package artifact
@@ -127,4 +131,5 @@ jobs:
           path: nupkg_output
 
       - name: Publish to NuGet.org
-        run: dotnet nuget push nupkg_output/*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
+        run: |
+          dotnet nuget push nupkg_output/*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate

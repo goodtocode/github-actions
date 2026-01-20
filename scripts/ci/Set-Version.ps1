@@ -78,12 +78,12 @@ $SemanticVersion = $versionObj.SemanticVersion
 
 Write-Debug "FileVersion: $FileVersion SemanticVersion: $SemanticVersion AssemblyVersion: $AssemblyVersion InformationalVersion: $InformationalVersion"
 
+# *.csproj C# Project files
+Update-ContentsByTag -Path $Path -Value $SemanticVersion -Open '<Version>' -Close '</Version>' -Include *.csproj
 # Package.json version
 Update-LineByContains -Path $Path -Contains 'version' -Line """version"": ""$FileVersion""," -Include package.json
 # OpenApiConfigurationOptions.cs version
 Update-LineByContains -Path $Path -Contains 'Version' -Line "Version = ""$AssemblyVersion""," -Include OpenApiConfigurationOptions.cs
-# *.csproj C# Project files
-Update-ContentsByTag -Path $Path -Value $FileVersion -Open '<Version>' -Close '</Version>' -Include *.csproj
 # *.nuspec NuGet packages
 Update-ContentsByTag -Path $Path -Value $SemanticVersion -Open '<version>' -Close '</version>' -Include *.nuspec
 # Assembly.cs C# assembly manifest

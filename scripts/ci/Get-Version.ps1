@@ -1,9 +1,21 @@
 #-----------------------------------------------------------------------
-<#
-Get-Version [-VersionToReplace <String>] [-Major <String>] [-Minor <String>] [-Revision <String>] [-Build <String>] [-Patch <String>] [-PreRelease <String>] [-CommitHash <String>]
-
-Example: .\Get-Version.ps1 -Major 1 -Minor 0
-#>
+# Get-Version [-VersionToReplace <String>] [-Major <String>] [-Minor <String>] [-Revision <String>] [-Build <String>] [-Patch <String>] [-PreRelease <String>] [-CommitHash <String>]
+#
+# 1. Default (auto date/time for revision/build/patch):
+#    .\Get-Version.ps1
+#    # Defaults: Major=1, Minor=0, Revision=(day of year), Build=(hour+minute), Patch=(month)
+#
+# 2. Set explicit major/minor (auto rest):
+#    .\Get-Version.ps1 -Major 2 -Minor 5
+#    # Defaults: Revision=(day of year), Build=(hour+minute), Patch=(month)
+#
+# 3. Full explicit version (no auto):
+#    .\Get-Version.ps1 -Major 1 -Minor 2 -Revision 3 -Build 4 -Patch 5
+#    # No defaults: all values are explicit
+#
+# 4. Pre-release and commit hash:
+#    .\Get-Version.ps1 -Major 1 -Minor 0 -Patch 1 -PreRelease -beta -CommitHash +abc123
+#    # Defaults: Revision=(day of year), Build=(hour+minute)
 #-----------------------------------------------------------------------
 
 # ***
@@ -58,11 +70,19 @@ if ([string]::IsNullOrWhiteSpace($Patch)) { $Patch = '0' }
 $PreRelease = Use-ValueOrDefault $PreRelease ''
 $CommitHash = Use-ValueOrDefault $CommitHash ''
 
+
+# Remove leading zeros for all numeric identifiers
+$vMajor = [int]$Major
+$vMinor = [int]$Minor
+$vRevision = [int]$Revision
+$vBuild = [int]$Build
+$vPatch = [int]$Patch
+
 # Version Formats
-$FileVersion = "$Major.$Minor.$Revision.$Build" # e.g. 1.0.0.0
-$AssemblyVersion = "$Major.$Minor.0.0"
-$InformationalVersion = "$Major.$Minor.$Revision$PreRelease$CommitHash"
-$SemanticVersion = "$Major.$Minor.$Patch$PreRelease"
+$FileVersion = "$vMajor.$vMinor.$vRevision.$vBuild" # e.g. 1.0.0.0
+$AssemblyVersion = "$vMajor.$vMinor.0.0"
+$InformationalVersion = "$vMajor.$vMinor.$vRevision$PreRelease$CommitHash"
+$SemanticVersion = "$vMajor.$vMinor.$vPatch$PreRelease"
 
 $result = [PSCustomObject]@{
 	FileVersion = $FileVersion
