@@ -1,6 +1,4 @@
-
-name: API+SQL CI/CD
-
+name: 'Azure API and SQL CI/CD'
 on:
   pull_request:
     branches:
@@ -21,7 +19,6 @@ on:
         required: true
         default: "development"
 
-
 permissions:
   id-token: write
   contents: read
@@ -30,35 +27,23 @@ permissions:
 env:
   SCRIPTS_PATH: "./.github/scripts"
   SRC_PATH: "./src"
-  SRC_SLN: "PRODUCT.sln"
+  SRC_SLN: "COMPANY.PRODUCT.sln"
   API_PATH: "Presentation.WebApi"
   API_PROJECT: "Presentation.WebApi.csproj"
   TEST_PATH: "Tests.Specs.Integration"
   TEST_PROJECT: "Tests.Specs.Integration.csproj"
-  AZURE_WEBAPP_NAME: "api-PRODUCT-dev-001"
-  AZURE_WEBAPP_PACKAGE_PATH: "."
-  AZURE_RG_NAME: "COMPANY-rg-SUBSCRIPTION-PRODUCT-dev-001"
-  APPI_NAME: "appi-PRODUCT-prod-001"
-  INFRA_PATH: "Infrastructure.SqlServer"
-  INFRA_PROJECT: "Infrastructure.SqlServer.csproj"
-  INFRA_DBCONTEXT: "SemanticKernelContext"
-  SQL_NAME: "sql-PRODUCT-prod-001"
-  SQLDB_NAME: "sqldb-PRODUCT-prod-001"
-
+  RUNTIME_ENV: "Development"
 
 jobs:
   ci:
-    name: "API+SQL CI"
+    name: "API CI"
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || github.event_name == 'push'
     environment: development
     strategy:
       matrix:
         DOTNET_VERSION: ["8.x", "9.x", "10.x"]
-
-    env:
-      RUNTIME_ENV: "Development"
-
+    # env: RUNTIME_ENV now global
     steps:
       - name: checkout
         uses: actions/checkout@v3
@@ -68,6 +53,14 @@ jobs:
         with:
           dotnet-version: ${{ matrix.DOTNET_VERSION }}
 
+      - name: Get Semantic Version
+        id: get_semver
+        run: |
+          $json = & "${{ env.SCRIPTS_PATH }}/ci/Get-Version.ps1" -Major 1 -Minor 1 -Patch $env:GITHUB_RUN_NUMBER
+          $semver = ($json | ConvertFrom-Json).SemanticVersion
+          echo "SEMANTIC_VERSION=$semver" >> $env:GITHUB_OUTPUT
+        shell: pwsh
+
       - name: Set-Version.ps1
         run: |
           $version = ${{ env.SCRIPTS_PATH }}/ci/Set-Version.ps1 -Path ${{ env.SRC_PATH }} -VersionToReplace 1.0.0 -Major 1 -Minor 1
@@ -75,16 +68,9 @@ jobs:
           echo "VERSION=$version" >> $GITHUB_ENV
         shell: pwsh
 
-
       - name: pipeline environment configuration
         run: |
           echo "ASPNETCORE_ENVIRONMENT=${{ env.RUNTIME_ENV }}" >> $GITHUB_ENV
-        shell: pwsh
-
-      # Set OpenAI API key as environment variable for test
-      - name: Set OpenAI API Key for Test
-        run: |
-          echo "OpenAI__ApiKey=${{ secrets.OPENAI_APIKEY }}" >> $GITHUB_ENV
         shell: pwsh
 
       - name: Initialize CodeQL
@@ -110,22 +96,22 @@ jobs:
           path: TestResults-${{ matrix.DOTNET_VERSION }}
         if: ${{ always() }}
 
-      - name: Publish API+SQL artifact
+      - name: Pack Digital Insights artifact
         run: |
-          dotnet publish ${{ env.SRC_PATH }}/${{ env.API_PATH }}/${{ env.API_PROJECT }} --configuration Release --no-build -o api_output
+          dotnet publish ${{ env.SRC_PATH }}/${{ env.API_PATH }}/${{ env.API_PROJECT }} --configuration Release --no-build --output publish_output --version ${{ steps.get_semver.outputs.SEMANTIC_VERSION }}
         shell: pwsh
 
-      - name: Upload API+SQL build artifact
+      - name: Upload Digital Insights artifact
         uses: actions/upload-artifact@v4
         with:
-          name: api-sql-artifact
-          path: api_output
+          name: digital-insights-artifact
+          path: publish_output/**
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v4
 
   cd:
-    name: "API+SQL CD"
+    name: "API and SQL CD"
     runs-on: ubuntu-latest
     needs: ci
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -134,25 +120,98 @@ jobs:
       matrix:
         DOTNET_VERSION: ["8.x", "9.x", "10.x"]
     env:
-      API_OUTPUT: "api_output"
+      AZURE_WEBAPP_NAME: api-diginsights-dev-001
+      AZURE_WEBAPP_PACKAGE_PATH: '.'
+      AZURE_RG_NAME: 'can-diginsights-dev-001-rg'
+      APPI_NAME: 'appi-diginsights-dev-001'
+      INFRA_PATH: 'Infrastructure.SqlServer'
+      INFRA_PROJECT: 'Infrastructure.SqlServer.csproj'
+      INFRA_DBCONTEXT: 'DigitalInsightsContext'
+      SQL_NAME: 'sql-diginsights-dev-001'
+      SQLDB_NAME: 'sqldb-diginsights-dev-001'
+      AZURE_CRED: '{"clientId":"${{ secrets.AZURE_CLIENT_ID }}","subscriptionId":"${{ secrets.SUBSCRIPTION_ID }}","tenantId":"${{ secrets.AZURE_TENANT_ID }}"}'
+      ARTIFACT_OUTPUT: 'publish_output'
     steps:
-      - name: Download API+SQL build artifact
+      - name: Download Digital Insights artifact
         uses: actions/download-artifact@v4
         with:
-          name: api-sql-artifact
-          path: api_output
+          name: digital-insights-artifact
+          path: publish_output
 
-      # Re-transform appsettings with secrets at deploy time
-      - name: App Settings Variable Substitution (CD)
-        uses: microsoft/variable-substitution@v1
+      - name: az login
+        uses: azure/login@v1
         with:
-          files: '${{ env.SRC_PATH }}/${{ env.API_PATH }}/appsettings.json, ${{ env.SRC_PATH }}/${{ env.API_PATH }}/appsettings.${{ env.RUNTIME_ENV }}.json'
-        env:
-          OpenAI.ApiKey: ${{ secrets.OPENAI_APIKEY }}
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      # Example deployment step:
-      # - name: Deploy to Azure Web App
-      #   uses: azure/webapps-deploy@v2
-      #   with:
-      #     app-name: ${{ env.AZURE_WEBAPP_NAME }}
-      #     package: '${{ env.AZURE_WEBAPP_PACKAGE_PATH }}/api_output'
+      - name: get publish profile
+        id: publishprofile
+        uses: aliencube/publish-profile-actions@v1
+        env:
+          AZURE_CREDENTIALS: ${{ env.AZURE_CRED }}
+        with:
+          resourceGroupName: ${{ env.AZURE_RG_NAME }}
+          appName: ${{ env.AZURE_WEBAPP_NAME }}
+
+      - name: functionapp deploy
+        uses: Azure/functions-action@v1
+        with:
+          app-name: ${{ env.AZURE_WEBAPP_NAME }}
+          package: '${{ env.AZURE_WEBAPP_PACKAGE_PATH }}/${{ env.AZURE_WEBAPP_NAME }}'
+          publish-profile: ${{ steps.publishprofile.outputs.profile }}
+        if: ${{ false }}
+
+      - name: webapps deploy
+        uses: azure/webapps-deploy@v2
+        with:
+          app-name: ${{ env.AZURE_WEBAPP_NAME }}
+          publish-profile: ${{ steps.publishprofile.outputs.profile }}
+          package: '${{ env.AZURE_WEBAPP_PACKAGE_PATH }}/${{ env.AZURE_WEBAPP_NAME }}'
+          #slot-name: staging
+
+      - name: Reset publish profile
+        uses: aliencube/publish-profile-actions@v1
+        env:
+          AZURE_CREDENTIALS: ${{ env.AZURE_CRED }}
+        with:
+          resourceGroupName: ${{ env.AZURE_RG_NAME }}
+          appName: ${{ env.AZURE_WEBAPP_NAME }}
+          reset: true
+
+      - name: ${{ env.AZURE_WEBAPP_NAME }} app settings
+        run: |
+          az config set extension.use_dynamic_install=yes_without_prompt
+          $TEMP_JSON = az monitor app-insights component show -g ${{ env.AZURE_RG_NAME }} --app ${{ env.APPI_NAME }} | ConvertFrom-Json
+          $INSTR_KEY = $TEMP_JSON.instrumentationKey
+          $CONN_STR = $TEMP_JSON.connectionString
+          az webapp config appsettings set -g ${{ env.AZURE_RG_NAME }} -n ${{ env.AZURE_WEBAPP_NAME }} --settings APPINSIGHTS_INSTRUMENTATIONKEY=$INSTR_KEY
+          az webapp config appsettings set -g ${{ env.AZURE_RG_NAME }} -n ${{ env.AZURE_WEBAPP_NAME }} --settings APPLICATIONINSIGHTS_CONNECTION_STRING=$CONN_STR
+          az webapp config appsettings set -g ${{ env.AZURE_RG_NAME }} -n ${{ env.AZURE_WEBAPP_NAME }} --settings ASPNETCORE_ENVIRONMENT=${{ env.RUNTIME_ENV }}
+        shell: pwsh
+
+      - name: ${{ env.AZURE_WEBAPP_NAME }} connection strings
+        run: |
+          $TEMP_STR=az sql db show-connection-string --client ado.net --server ${{ env.SQL_NAME }} --name ${{ env.SQLDB_NAME }} -o tsv
+          $TEMP_STR=$TEMP_STR.replace("<username>", "${{ secrets.SQL_ADMIN_USER }}")
+          $TEMP_STR=$TEMP_STR.replace("<password>", "${{ secrets.SQL_ADMIN_PASSWORD }}")
+          az webapp config connection-string set -g ${{ env.AZURE_RG_NAME }} -n ${{ env.AZURE_WEBAPP_NAME }} -t SQLServer --settings DefaultConnection=$TEMP_STR
+        shell: pwsh
+
+      - name: ${{ env.AZURE_WEBAPP_NAME }} dotnet ef migrations
+        run: |
+          $TEMP_STR=az sql db show-connection-string --client ado.net --server ${{ env.SQL_NAME }} --name ${{ env.SQLDB_NAME }} -o tsv
+          $TEMP_STR=$TEMP_STR.replace("<username>", "${{ secrets.SQL_ADMIN_USER }}")
+          $TEMP_STR=$TEMP_STR.replace("<password>", "${{ secrets.SQL_ADMIN_PASSWORD }}")
+          dotnet tool install --global dotnet-ef
+          dotnet tool restore
+          dotnet ef migrations add v${{ env.VERSION }} --project ${{ env.SRC_PATH }}/${{ env.INFRA_PATH }}/${{ env.INFRA_PROJECT }} --startup-project ${{ env.SRC_PATH }}/${{ env.API_PATH }}/${{ env.API_PROJECT }} --context ${{ env.INFRA_DBCONTEXT }}
+          dotnet ef migrations script --project ${{ env.SRC_PATH }}/${{ env.INFRA_PATH }}/${{ env.INFRA_PROJECT }} --startup-project ${{ env.SRC_PATH }}/${{ env.API_PATH }}/${{ env.API_PROJECT }} --context ${{ env.INFRA_DBCONTEXT }} --output ${{ github.workspace }}/sql/migrations.sql --idempotent
+          dotnet ef database update --project ${{ env.SRC_PATH }}/${{ env.INFRA_PATH }}/${{ env.INFRA_PROJECT }} --startup-project ${{ env.SRC_PATH }}/${{ env.API_PATH }}/${{ env.API_PROJECT }} --context ${{ env.INFRA_DBCONTEXT }} --connection $TEMP_STR
+        shell: pwsh
+
+      - name: Swap to production slot
+        run: |
+          az webapp deployment slot swap --resource-group ${{ env.AZURE_RG_NAME }} --name ${{ env.AZURE_WEBAPP_NAME }} --slot staging --target-slot production
+          echo "Swap finished. App Service Application URL: https://$(az webapp show --resource-group ${{ env.AZURE_RG_NAME }} --name ${{ env.AZURE_WEBAPP_NAME }} --query hostNames[0] -o tsv)"
+        if: ${{ false }}
