@@ -42,7 +42,7 @@ jobs:
     environment: development
     strategy:
       matrix:
-        DOTNET_VERSION: ["8.x", "9.x", "10.x"]
+        DOTNET_VERSION: ["10.x"]
     # env: RUNTIME_ENV now global
     steps:
       - name: checkout
@@ -86,7 +86,7 @@ jobs:
       - name: Test
         run: |
           mkdir -p TestResults-${{ matrix.DOTNET_VERSION }}
-          dotnet test ${{ env.SRC_PATH }}/${{ env.TEST_PATH }}/${{ env.TEST_PROJECT }} --logger "trx;LogFileName=test_results.trx" --results-directory TestResults-${{ matrix.DOTNET_VERSION }} --verbosity normal
+          dotnet test ${{ env.SRC_PATH }}/${{ env.TEST_PATH }}/${{ env.TEST_PROJECT }} --results-directory TestResults-${{ matrix.DOTNET_VERSION }} --collect:"Code Coverage" --verbosity normal
         shell: pwsh
 
       - name: Upload test results
@@ -118,7 +118,7 @@ jobs:
     environment: production
     strategy:
       matrix:
-        DOTNET_VERSION: ["8.x", "9.x", "10.x"]
+        DOTNET_VERSION: ["10.x"]
     env:
       AZURE_WEBAPP_NAME: api-diginsights-dev-001
       AZURE_WEBAPP_PACKAGE_PATH: '.'

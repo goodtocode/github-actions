@@ -1,217 +1,78 @@
-# GitHub Actions YAML for Azure Deployments
-<sup>This repo is a starting point for using GitHub Actions YAML files to automate cloud infrastructure, building source, unit-testing source, deploying source and running external integration tests.</sup> <br>
+## GitHub Actions Templates for Azure CI/CD
 
-This is a simple GitHub Actions YAML for Azure Deployments [GitHub Actions for Azure](https://docs.microsoft.com/en-us/azure/developer/github/github-actions)
+This repository provides ready-to-use GitHub Actions YAML templates and PowerShell scripts for automating CI/CD pipelines for .NET web APIs, Blazor apps, Bicep-based infrastructure-as-code (IaC), Azure Static Web Apps, and NuGet package publishing.
 
-This repository relates to the following activities:
-* Deploy [Enterprise-scale Architecture Landing Zones](https://docs.microsoft.com/en-us/azure/cloud-adoption-framework/ready/landing-zone/#:~:text=Azure%20landing%20zones%20are%20the%20output%20of%20a,as%20a%20service%20or%20platform%20as%20a%20service.)
-* Deploy Azure cloud infrastructure
-* Building source with dotnet build
-* Unit-testing source with dotnet tests
-* Deploying source to cloud infrastructure
-* And running external integration tests
+## Overview
 
-## Repo Contents
+These templates help you:
+- Build, test, and deploy .NET web APIs and Blazor applications to Azure
+- Deploy Azure infrastructure using Bicep (IaC)
+- Build and publish NuGet packages
+- Deploy Azure Static Web Apps
+- Use best practices for secure, automated, and repeatable deployments
 
-#### /workflows folder (YAML)
-Path | Item | Contents
---- | --- | ---
-workflows | - | Contains all scripts, steps, variables and main-pipeline files
-workflows | COMPANY-rg-PRODUCT-infrastructure.yml | Main-pipeline file to deploy cloud landing zone, and infrastructure
-workflows | COMPANY-rg-PRODUCT-src.yml | Main-pipeline file to build/test/deply src, unit tests and integration tests
+## Repository Structure
 
-#### /scripts folder (PowerShell)
-Path | Item | Contents
---- | --- | ---
-workflows/scripts | - | Contains GitHub Actions YAML files, Windows PowerShell scripts, and variables to support GitHub Actions YAML workflows.
-workflows/scripts | System.psm1 | Powershell helpers for system-level functions
-workflows/scripts | Set-Version.ps1 | Sets version per MAJOR.MINOR.REVISION.BUILD methodology
-workflows/scripts | Get-AzureAd.ps1 | Manual script for getting Azure AD information
-workflows/scripts | New-SelfSignedCert.ps1 | Manual script for generating a self-signed certificate
+### Workflows (`/workflows`)
 
-#### Azure Services used in these repositories
-Azure Service | Purpose
-:---------------------:| --- 
-[Azure Cosmos DB](https://azure.microsoft.com/en-us/services/cosmos-db/)| NoSQL database where original content as well as processing results are stored.
-[Azure Functions](https://azure.microsoft.com/en-us/try/app-service/)|Code blocks that analyze the documents stored in the Azure Cosmos DB.
-[Azure Service Bus](https://azure.microsoft.com/en-us/services/service-bus/)|Service bus queues are used as triggers for durable Azure Functions.
-[Azure Storage](https://azure.microsoft.com/en-us/services/storage/)|Holds images from articles and hosts the code for the Azure Functions.
+| File | Purpose |
+|------|---------|
+| COMPANY-PRODUCT-api.yml | CI/CD for .NET Web API (build, test, deploy to Azure App Service) |
+| COMPANY-PRODUCT-api-sql.yml | CI/CD for .NET Web API with Azure SQL (includes DB migration) |
+| COMPANY-PRODUCT-iac.yml | Deploy Azure infrastructure using Bicep templates |
+| COMPANY-PRODUCT-stapp-ci-cd.yml | CI/CD for Azure Static Web Apps (Blazor, SPA, etc.) |
+| COMPANY-PRODUCT-nuget.yml | Build, test, and publish NuGet packages |
 
-## Creating a new Github Repo
+### Scripts (`/scripts`)
 
-### New GitHub Repository Setup — Checklist
+Scripts are organized by function:
+- `ci/` - Versioning, build, and test helpers (e.g., `Get-Version.ps1`, `Set-Version.ps1`)
+- `cd/` - Managed identity and NuGet package management
+- `iac/` - Azure CLI, Key Vault, Bicep, and certificate helpers
+- `repo/` - GitHub repo and secret automation
+- `System.psm1` - Common PowerShell functions
 
-| Step | Checklist Item | Notes / Source |
-|------|----------------|----------------|
-| 1 | [ ] Create repository (UI or CLI) | Use GitHub UI or CLI. Template repos only copy files, not settings.  |
-| 2 | [ ] Set branch protection for main | Configure in UI or via CLI.  |
-| 3 | [ ] Enable Code Scanning (CodeQL) | Use Default Setup in UI or add workflow file.  |
-| 4 | [ ] Enable Secret Scanning & Push Protection | Enable in Security & analysis settings or via CLI. |
-| 5 | [ ] Enable Dependabot alerts & security updates | Enable in Security & analysis settings. Add dependabot.yml for version updates.  |
-| 6 | [ ] Create development environment | Add environment secrets, restrict to dev branch if needed. |
-| 7 | [ ] Create production environment | Add secrets, required reviewers, restrict to main branch.  |
-| 8 | [ ] Confirm CI/workflow files exist | Ensure workflows from template are present.  |
-| 9 | [ ] Final checks | Verify CI runs, PR rules, CodeQL, Secret scanning, Dependabot, environments, secrets. |
+## How to Use
 
-## New GitHub Repository Setup — Manual/CLI Steps
+1. **Copy the relevant workflow YAML(s) from `/workflows` into your repo's `.github/workflows/` directory.**
+2. **Update placeholder values** (e.g., `COMPANY`, `PRODUCT`, resource names, paths) to match your project.
+3. **Add required secrets** to your GitHub repository (Azure credentials, API keys, etc.). See each workflow for required secrets.
+4. **(Optional) Customize scripts** in `/scripts` for your environment or extend as needed.
+5. **Push changes to trigger the workflows.**
 
-1. Create the Repository
+### Example: Deploying a .NET Web API to Azure
+- Use `COMPANY-PRODUCT-api.yml` or `COMPANY-PRODUCT-api-sql.yml` for CI/CD.
+- Ensure your repo contains a `.sln` and project files in the expected structure.
+- Add secrets: `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`, and (for SQL) `SQL_ADMIN_USER`, `SQL_ADMIN_PASSWORD`.
+- The workflow will build, test, publish, and deploy your app to Azure App Service, and (if using SQL) run EF Core migrations.
 
-    1.1 In GitHub UI:
+### Example: Deploying Infrastructure with Bicep
+- Use `COMPANY-PRODUCT-iac.yml`.
+- Place your Bicep templates and parameter files in the `.azure/` directory.
+- Add Azure credentials as secrets.
+- The workflow will create/validate/deploy resource groups and Bicep templates.
 
-    - New → Repository
-    - Choose Public + MIT License (OSS) or Private + No license (closed source)
-    - Check Add README
-    - Add Visual Studio .gitignore
+### Example: Publishing a NuGet Package
+- Use `COMPANY-PRODUCT-nuget.yml`.
+- Add your NuGet API key as a secret (`NUGET_API_KEY`).
+- The workflow will build, test, pack, and publish your package to NuGet.org.
 
-    1.2 OR via GitHub CLI:
+### Example: Azure Static Web Apps
+- Use `COMPANY-PRODUCT-stapp-ci-cd.yml`.
+- Add your Static Web Apps deployment token as a secret (`AZURE_STATIC_WEB_APPS_API_TOKEN`).
+- The workflow will build and deploy your static app to Azure.
 
-    ```sh
-    gh repo create <owner>/<repo> \
-      --public \  # or --private
-      --description "My library" \
-      --add-readme \
-      --gitignore "VisualStudio" \
-      --license "mit"   # omit for private repos
-    ```
+## Best Practices & Recommendations
+- **Keep secrets secure:** Use GitHub Secrets for all credentials and sensitive values.
+- **Branch protection:** Enable branch protection and require PRs for main branch deployments.
+- **Code scanning:** Enable CodeQL and secret scanning for security.
+- **Environment separation:** Use GitHub Environments for dev/prod and restrict deployments appropriately.
+- **Dependabot:** Enable Dependabot for dependency and security updates.
+- **Customize as needed:** These templates are a starting point—adapt them for your org/project.
 
-    Template repositories only copy files, not settings. 
+## Additional Resources
+- [GitHub Actions for Azure](https://docs.microsoft.com/en-us/azure/developer/github/github-actions)
+- [Azure Bicep Documentation](https://docs.microsoft.com/en-us/azure/azure-resource-manager/bicep/overview)
+- [GitHub Actions Documentation](https://docs.github.com/en/actions)
 
-
-2. Set Branch Protection for main
-
-    Branch protection rules must be configured per‑repo.
-
-    2.1 In GitHub UI:
-
-    - Go to Settings → Branches → Add rule
-    - Pattern: main
-    - Enable:
-      - Require a pull request before merging
-      - Require squash merging only
-      - Allow author to self‑approve (uncheck “Require review from Code Owners”)
-      - Required status checks (leave empty for now—will populate after CI/CodeQL runs)
-      - Require conversation resolution
-      - Block force pushes & branch deletion
-
-    2.2 CLI (optional—creates/updates a branch protection rule):
-
-    ```sh
-    gh api -X PUT "repos/<owner>/<repo>/branches/main/protection" \
-      -f required_status_checks.strict=true \
-      -f enforce_admins=true \
-      -f required_pull_request_reviews='{"require_code_owner_reviews":false}' \
-      -f restrictions='{"users":[],"teams":[],"apps":[]}'
-    ```
-
-    The REST API updates/creates branch protection rules.
-
-3. Enable Code Scanning (CodeQL)
-
-    Code scanning via CodeQL can be enabled using Default Setup or a workflow file. Default setup is the fastest.
-
-    Default Setup auto‑configures scanning on pushes, PRs, and weekly.
-
-    CodeQL scanning is available for public repos for free.
-
-    3.1 In GitHub UI:
-
-    - Go to Security → Code security & analysis
-    - Under Code scanning, click Set up → Default
-    - Click Enable CodeQL
-
-    3.2 If you prefer advanced workflow instead:
-
-    - Add .github/workflows/codeql-analysis.yml (copied from your template or GitHub’s starter)
-
-    No CLI is available to "toggle on" Default Setup yet; it must be done in UI, or you commit an advanced workflow file.
-
-4. Enable Secret Scanning & Push Protection
-
-    Secret Scanning: detects leaked secrets in repos.
-    Push Protection: blocks pushes containing secret patterns.
-
-    4.1 In GitHub UI
-
-    - Settings → Security & analysis
-    - Enable Secret scanning
-    - Enable Push protection
-
-    4.2 CLI (recommended):
-
-    ```sh
-    gh api -X PATCH repos/<owner>/<repo> \
-      -f security_and_analysis='{    "secret_scanning": {"status":"enabled"},    "secret_scanning_push_protection": {"status":"enabled"}  }'
-    ```
-
-
-5. Enable Dependabot Alerts & Security Updates
-
-    Dependabot alerts are repo/org settings; version updates come from dependabot.yml.
-    Alerts & security updates must be manually enabled.
-    Security updates auto‑open PRs for known vulnerabilities.
-
-    5.1 GitHub UI
-
-    - Settings → Security & analysis
-    - Enable Dependabot alerts
-    - Enable Dependabot security updates
-
-    5.2 Add version update file (optional):
-
-    ```yaml
-    # .github/dependabot.yml
-    version: 2
-    updates:
-      - package-ecosystem: "nuget"
-        directory: "/"
-        schedule:
-          interval: "weekly"
-    ```
-
-6. Create the Development Environment
-
-    GitHub Environments allow scoped secrets & protection rules.
-    They must be created manually per repo.
-
-    6.1 In GitHub UI:
-    - Settings → Environments → New environment
-    - Name: development
-    - Add environment secrets (e.g., DEV_API_KEY)
-    - (Optional) Restrict to branch dev
-
-
-7. Create the Production Environment
-
-    Production typically has required reviewers & stricter rules.
-    Required reviewers are environment‑level protection rules.
-
-    7.1 In GitHub UI:
-    
-    - Settings → Environments → New environment
-    - Name: production
-    - Add environment secrets (e.g., PROD_API_KEY)
-    - Add Required reviewers (you for now)
-    - Restrict deployments to branch main
-
-
-8. Confirm CI/Workflows Exist (from template)
-
-    Workflow files do propagate from template repos.
-
-    - .github/workflows/ci.yml
-    - .github/workflows/codeql-analysis.yml (if using advanced setup)
-    - .github/workflows/promote-dev-to-main.yml (your automation)
-    - dependabot.yml if using Dependabot version updates
-    - CODEOWNERS (optional)
-
-
-9. Final Checks
-    
-    - Push a commit → verify CI runs
-    - Open a PR → verify branch protections enforce PR rules
-    - Confirm CodeQL ran at least once (Security → Code scanning alerts)
-    - Confirm Secret scanning is active (Security → Secret scanning)
-    - Confirm Dependabot alerts appear
-    - Confirm environments show up in deployment dropdowns
-    - Confirm environment secrets resolve in Actions logs
+---
