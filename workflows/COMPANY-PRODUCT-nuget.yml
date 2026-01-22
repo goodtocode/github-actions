@@ -41,7 +41,7 @@ jobs:
     environment: development
     strategy:
       matrix:
-        DOTNET_VERSION: ["8.x", "9.x", "10.x"]
+        DOTNET_VERSION: ["10.x"]
 
     env:
       RUNTIME_ENV: "Development"
@@ -120,7 +120,7 @@ jobs:
     environment: production
     strategy:
       matrix:
-        DOTNET_VERSION: ["8.x", "9.x", "10.x"]
+        DOTNET_VERSION: ["10.x"]
     env:
       NUGET_OUTPUT: "nupkg_output"
     steps:
