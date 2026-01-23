@@ -70,16 +70,22 @@ $getVersionArgs = @{
 }
 $versionJson = & $getVersionScript @getVersionArgs
 $versionObj = $versionJson | ConvertFrom-Json
+Write-Debug "Get-Version: $($versionJson | ConvertTo-Json -Depth 10)"
 
 $FileVersion = $versionObj.FileVersion
 $AssemblyVersion = $versionObj.AssemblyVersion
 $InformationalVersion = $versionObj.InformationalVersion
 $SemanticVersion = $versionObj.SemanticVersion
-
 Write-Debug "FileVersion: $FileVersion SemanticVersion: $SemanticVersion AssemblyVersion: $AssemblyVersion InformationalVersion: $InformationalVersion"
 
 # *.csproj C# Project files
 Update-ContentsByTag -Path $Path -Value $SemanticVersion -Open '<Version>' -Close '</Version>' -Include *.csproj
+Update-ContentsByTag -Path $Path -Value $FileVersion -Open '<FileVersion>' -Close '</FileVersion>' -Include *.csproj
+Update-ContentsByTag -Path $Path -Value $AssemblyVersion -Open '<AssemblyVersion>' -Close '</AssemblyVersion>' -Include *.csproj
+Update-ContentsByTag -Path $Path -Value $InformationalVersion -Open '<InformationalVersion>' -Close '</InformationalVersion>' -Include *.csproj
+# *.props/.targets/Directory.Build.props/targets (common for shared versioning)
+Update-ContentsByTag -Path $Path -Value $SemanticVersion -Open '<Version>' -Close '</Version>' -Include *.props,*.targets,Directory.Build.props,Directory.Build.targets
+Update-ContentsByTag -Path $Path -Value $SemanticVersion -Open '<PackageVersion>' -Close '</PackageVersion>' -Include *.props,*.targets,Directory.Build.props,Directory.Build.targets
 # Package.json version
 Update-LineByContains -Path $Path -Contains 'version' -Line """version"": ""$FileVersion""," -Include package.json
 # OpenApiConfigurationOptions.cs version
