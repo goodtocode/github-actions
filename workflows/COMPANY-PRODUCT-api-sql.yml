@@ -110,6 +110,21 @@ jobs:
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v4
 
+      - name: Run Coverage Script
+        run: |
+          pwsh ${{ env.SRC_PATH }}/Get-CodeCoverage.ps1 `
+            -TestProjectFilter '${{ env.TEST_PROJECT }}' `
+            -ProdPackagesOnly `
+            -ProductionAssemblies Core.Application Presentation.WebApi Presentation.Blazor
+        shell: pwsh
+
+      - name: Upload Coverage Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report-${{ matrix.DOTNET_VERSION }}
+          path: ${{ env.SRC_PATH }}/TestResults/Reports/**/index.html
+        if: ${{ always() }}
+
   cd:
     name: "API and SQL CD"
     runs-on: ubuntu-latest
