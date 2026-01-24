@@ -73,20 +73,25 @@ if ($repoExists) {
 
 # ---- 2) Enable security & analysis: Secret Scanning + Push Protection (fixed payload)
 if ($repoExists) {
-  $secStatus = gh api "repos/$Owner/$Repo" | ConvertFrom-Json | Select-Object -ExpandProperty security_and_analysis
-  if ($secStatus.secret_scanning.status -ne "enabled" -or $secStatus.secret_scanning_push_protection.status -ne "enabled") {
-    $ghArgs = @(
-      'api',
-      '-X', 'PATCH',
-      "repos/$Owner/$Repo",
-      '-f', 'secret_scanning.status=enabled',
-      '-f', 'secret_scanning_push_protection.status=enabled'
-    )
-    $response = gh @ghArgs
-    Write-Host "Enabled secret scanning and push protection."
-  }
-  else {
-    Write-Host "Secret scanning and push protection already enabled."
+  $repoJson = gh api "repos/$Owner/$Repo" | ConvertFrom-Json
+  if ($repoJson.PSObject.Properties.Name -contains 'security_and_analysis') {
+    $secStatus = $repoJson.security_and_analysis
+    if ($secStatus.secret_scanning.status -ne "enabled" -or $secStatus.secret_scanning_push_protection.status -ne "enabled") {
+      $ghArgs = @(
+        'api',
+        '-X', 'PATCH',
+        "repos/$Owner/$Repo",
+        '-f', 'secret_scanning.status=enabled',
+        '-f', 'secret_scanning_push_protection.status=enabled'
+      )
+      $response = gh @ghArgs
+      Write-Host "Enabled secret scanning and push protection."
+    }
+    else {
+      Write-Host "Secret scanning and push protection already enabled."
+    }
+  } else {
+    Write-Host "Warning: 'security_and_analysis' property not found in repo API response. Skipping secret scanning and push protection setup."
   }
 }
 
