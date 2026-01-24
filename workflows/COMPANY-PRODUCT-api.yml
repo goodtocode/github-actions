@@ -98,15 +98,15 @@ jobs:
           path: TestResults-${{ matrix.DOTNET_VERSION }}
         if: ${{ always() }}
 
-      - name: Pack Digital Insights artifact
+      - name: Pack Web API artifact
         run: |
           dotnet publish ${{ env.SRC_PATH }}/${{ env.API_PATH }}/${{ env.API_PROJECT }} --configuration Release --no-build --output publish_output
         shell: pwsh
 
-      - name: Upload Digital Insights artifact
+      - name: Upload Web API artifact
         uses: actions/upload-artifact@v4
         with:
-          name: digital-insights-artifact
+          name: api-artifact
           path: publish_output/**
 
       - name: Perform CodeQL Analysis
@@ -144,10 +144,10 @@ jobs:
       AZURE_CRED: '{"clientId":"${{ secrets.AZURE_CLIENT_ID }}","subscriptionId":"${{ secrets.SUBSCRIPTION_ID }}","tenantId":"${{ secrets.AZURE_TENANT_ID }}"}'
       ARTIFACT_OUTPUT: 'publish_output'
     steps:
-      - name: Download Digital Insights artifact
+      - name: Download Web API artifact
         uses: actions/download-artifact@v4
         with:
-          name: digital-insights-artifact
+          name: api-artifact
           path: publish_output
 
       - name: az login
