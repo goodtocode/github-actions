@@ -73,7 +73,15 @@ jobs:
       - name: pipeline environment configuration
         run: |
           echo "ASPNETCORE_ENVIRONMENT=${{ env.RUNTIME_ENV }}" >> $GITHUB_ENV
+          echo "OpenAI:ApiKey=${{ secrets.OPENAI_APIKEY }}" >> $GITHUB_ENV
         shell: pwsh
+
+      - name: App Settings Variable Substitution
+        uses: microsoft/variable-substitution@v1
+        with:
+          files: '${{ env.SRC_PATH }}/${{ env.API_PATH }}/appsettings.json, ${{ env.SRC_PATH }}/${{ env.API_PATH }}/appsettings.${{ env.RUNTIME_ENV }}.json, ${{ env.SRC_PATH }}/${{ env.TEST_PATH }}/appsettings.test.json'
+        env: 
+          OpenAI.ApiKey: ${{ secrets.OPENAI_APIKEY }}
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v4
@@ -143,29 +151,41 @@ jobs:
     name: "API and SQL CD"
     runs-on: ubuntu-latest
     needs: ci
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    environment: production
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || github.event_name == 'push'
+    # if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    environment: development
     strategy:
       matrix:
         DOTNET_VERSION: ["10.x"]
     env:
-      AZURE_WEBAPP_NAME: api-diginsights-dev-001
+      AZURE_APIAPP_NAME: PRODUCT-dev-001-api
       AZURE_WEBAPP_PACKAGE_PATH: '.'
-      AZURE_RG_NAME: 'can-diginsights-dev-001-rg'
-      APPI_NAME: 'appi-diginsights-dev-001'
+      AZURE_WEBAPP_NAME: PRODUCT-dev-001-web
+      AZURE_RG_NAME: 'can-PRODUCT-dev-001-rg'
+      APPI_NAME: 'PRODUCT-dev-001-appi'
       INFRA_PATH: 'Infrastructure.SqlServer'
       INFRA_PROJECT: 'Infrastructure.SqlServer.csproj'
-      INFRA_DBCONTEXT: 'DigitalInsightsContext'
-      SQL_NAME: 'sql-diginsights-dev-001'
-      SQLDB_NAME: 'sqldb-diginsights-dev-001'
+      INFRA_DBCONTEXT: 'PRODUCTContext'
+      SQL_NAME: 'PRODUCT-dev-001-sql'
+      SQLDB_NAME: 'PRODUCT-dev-001-sqldb'
       AZURE_CRED: '{"clientId":"${{ secrets.AZURE_CLIENT_ID }}","subscriptionId":"${{ secrets.SUBSCRIPTION_ID }}","tenantId":"${{ secrets.AZURE_TENANT_ID }}"}'
-      ARTIFACT_OUTPUT: 'publish_output'
+      API_ARTIFACT_OUTPUT: 'publish_output'
+      WEB_ARTIFACT_OUTPUT: 'publish_blazor_output'
+      API_ARTIFACT_NAME: 'api-artifact'
+      WEB_ARTIFACT_NAME: 'web-artifact'
+
     steps:
       - name: Download Web API artifact
         uses: actions/download-artifact@v4
         with:
-          name: api-artifact
-          path: publish_output
+          name: ${{ env.API_ARTIFACT_NAME }}
+          path: ${{ env.API_ARTIFACT_OUTPUT }}
+
+      - name: Download Web Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ env.WEB_ARTIFACT_NAME }}
+          path: ${{ env.WEB_ARTIFACT_OUTPUT }}
 
       - name: az login
         uses: azure/login@v1
@@ -174,8 +194,17 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: get publish profile
-        id: publishprofile
+      - name: get API publish profile
+        id: publishprofileapi
+        uses: aliencube/publish-profile-actions@v1
+        env:
+          AZURE_CREDENTIALS: ${{ env.AZURE_CRED }}
+        with:
+          resourceGroupName: ${{ env.AZURE_RG_NAME }}
+          appName: ${{ env.AZURE_APIAPP_NAME }}
+
+      - name: get Web publish profile
+        id: publishprofileweb
         uses: aliencube/publish-profile-actions@v1
         env:
           AZURE_CREDENTIALS: ${{ env.AZURE_CRED }}
@@ -183,20 +212,20 @@ jobs:
           resourceGroupName: ${{ env.AZURE_RG_NAME }}
           appName: ${{ env.AZURE_WEBAPP_NAME }}
 
-      - name: functionapp deploy
-        uses: Azure/functions-action@v1
+      - name: Deploy Web API to Azure App Service
+        uses: azure/webapps-deploy@v2
         with:
-          app-name: ${{ env.AZURE_WEBAPP_NAME }}
-          package: '${{ env.AZURE_WEBAPP_PACKAGE_PATH }}/${{ env.AZURE_WEBAPP_NAME }}'
-          publish-profile: ${{ steps.publishprofile.outputs.profile }}
-        if: ${{ false }}
+          app-name: ${{ env.AZURE_APIAPP_NAME }}
+          publish-profile: ${{ steps.publishprofileapi.outputs.profile }}
+          package: ${{ env.API_ARTIFACT_OUTPUT }}
+          #slot-name: staging
 
-      - name: webapps deploy
+      - name: Deploy Blazor to Azure App Service
         uses: azure/webapps-deploy@v2
         with:
           app-name: ${{ env.AZURE_WEBAPP_NAME }}
-          publish-profile: ${{ steps.publishprofile.outputs.profile }}
-          package: '${{ env.AZURE_WEBAPP_PACKAGE_PATH }}/${{ env.AZURE_WEBAPP_NAME }}'
+          publish-profile: ${{ steps.publishprofileweb.outputs.profile }}
+          package: ${{ env.WEB_ARTIFACT_OUTPUT }}
           #slot-name: staging
 
       - name: Reset publish profile
@@ -205,29 +234,29 @@ jobs:
           AZURE_CREDENTIALS: ${{ env.AZURE_CRED }}
         with:
           resourceGroupName: ${{ env.AZURE_RG_NAME }}
-          appName: ${{ env.AZURE_WEBAPP_NAME }}
+          appName: ${{ env.AZURE_APIAPP_NAME }}
           reset: true
 
-      - name: ${{ env.AZURE_WEBAPP_NAME }} app settings
+      - name: ${{ env.AZURE_APIAPP_NAME }} app settings
         run: |
           az config set extension.use_dynamic_install=yes_without_prompt
           $TEMP_JSON = az monitor app-insights component show -g ${{ env.AZURE_RG_NAME }} --app ${{ env.APPI_NAME }} | ConvertFrom-Json
           $INSTR_KEY = $TEMP_JSON.instrumentationKey
           $CONN_STR = $TEMP_JSON.connectionString
-          az webapp config appsettings set -g ${{ env.AZURE_RG_NAME }} -n ${{ env.AZURE_WEBAPP_NAME }} --settings APPINSIGHTS_INSTRUMENTATIONKEY=$INSTR_KEY
-          az webapp config appsettings set -g ${{ env.AZURE_RG_NAME }} -n ${{ env.AZURE_WEBAPP_NAME }} --settings APPLICATIONINSIGHTS_CONNECTION_STRING=$CONN_STR
-          az webapp config appsettings set -g ${{ env.AZURE_RG_NAME }} -n ${{ env.AZURE_WEBAPP_NAME }} --settings ASPNETCORE_ENVIRONMENT=${{ env.RUNTIME_ENV }}
+          az webapp config appsettings set -g ${{ env.AZURE_RG_NAME }} -n ${{ env.AZURE_APIAPP_NAME }} --settings APPINSIGHTS_INSTRUMENTATIONKEY=$INSTR_KEY
+          az webapp config appsettings set -g ${{ env.AZURE_RG_NAME }} -n ${{ env.AZURE_APIAPP_NAME }} --settings APPLICATIONINSIGHTS_CONNECTION_STRING=$CONN_STR
+          az webapp config appsettings set -g ${{ env.AZURE_RG_NAME }} -n ${{ env.AZURE_APIAPP_NAME }} --settings ASPNETCORE_ENVIRONMENT=${{ env.RUNTIME_ENV }}
         shell: pwsh
 
-      - name: ${{ env.AZURE_WEBAPP_NAME }} connection strings
+      - name: ${{ env.AZURE_APIAPP_NAME }} connection strings
         run: |
           $TEMP_STR=az sql db show-connection-string --client ado.net --server ${{ env.SQL_NAME }} --name ${{ env.SQLDB_NAME }} -o tsv
           $TEMP_STR=$TEMP_STR.replace("<username>", "${{ secrets.SQL_ADMIN_USER }}")
           $TEMP_STR=$TEMP_STR.replace("<password>", "${{ secrets.SQL_ADMIN_PASSWORD }}")
-          az webapp config connection-string set -g ${{ env.AZURE_RG_NAME }} -n ${{ env.AZURE_WEBAPP_NAME }} -t SQLServer --settings DefaultConnection=$TEMP_STR
+          az webapp config connection-string set -g ${{ env.AZURE_RG_NAME }} -n ${{ env.AZURE_APIAPP_NAME }} -t SQLServer --settings DefaultConnection=$TEMP_STR
         shell: pwsh
 
-      - name: ${{ env.AZURE_WEBAPP_NAME }} dotnet ef migrations
+      - name: ${{ env.AZURE_APIAPP_NAME }} dotnet ef migrations
         run: |
           $TEMP_STR=az sql db show-connection-string --client ado.net --server ${{ env.SQL_NAME }} --name ${{ env.SQLDB_NAME }} -o tsv
           $TEMP_STR=$TEMP_STR.replace("<username>", "${{ secrets.SQL_ADMIN_USER }}")
@@ -241,6 +270,6 @@ jobs:
 
       - name: Swap to production slot
         run: |
-          az webapp deployment slot swap --resource-group ${{ env.AZURE_RG_NAME }} --name ${{ env.AZURE_WEBAPP_NAME }} --slot staging --target-slot production
-          echo "Swap finished. App Service Application URL: https://$(az webapp show --resource-group ${{ env.AZURE_RG_NAME }} --name ${{ env.AZURE_WEBAPP_NAME }} --query hostNames[0] -o tsv)"
+          az webapp deployment slot swap --resource-group ${{ env.AZURE_RG_NAME }} --name ${{ env.AZURE_APIAPP_NAME }} --slot staging --target-slot production
+          echo "Swap finished. App Service Application URL: https://$(az webapp show --resource-group ${{ env.AZURE_RG_NAME }} --name ${{ env.AZURE_APIAPP_NAME }} --query hostNames[0] -o tsv)"
         if: ${{ false }}
