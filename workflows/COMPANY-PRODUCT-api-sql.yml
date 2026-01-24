@@ -98,7 +98,7 @@ jobs:
 
       - name: Pack Digital Insights artifact
         run: |
-          dotnet publish ${{ env.SRC_PATH }}/${{ env.API_PATH }}/${{ env.API_PROJECT }} --configuration Release --no-build --output publish_output --version ${{ steps.get_semver.outputs.SEMANTIC_VERSION }}
+          dotnet publish ${{ env.SRC_PATH }}/${{ env.API_PATH }}/${{ env.API_PROJECT }} --configuration Release --no-build --output publish_output
         shell: pwsh
 
       - name: Upload Digital Insights artifact
