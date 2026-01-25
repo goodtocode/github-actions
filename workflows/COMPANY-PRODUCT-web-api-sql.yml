@@ -4,13 +4,13 @@ on:
     branches:
       - main
     paths:
-      - .github/workflows/COMPANY-PRODUCT-api.yml
+      - .github/workflows/COMPANY-PRODUCT-web-api-sql.yml
       - src/**
   push:
     branches:
       - main
     paths:
-      - .github/workflows/COMPANY-PRODUCT-api.yml
+      - .github/workflows/COMPANY-PRODUCT-web-api-sql.yml
       - src/**
   workflow_dispatch:
     inputs:
@@ -26,7 +26,12 @@ permissions:
 
 env:
   API_ARTIFACT_OUTPUT: 'publish_output'
+  WEB_ARTIFACT_OUTPUT: 'publish_blazor_output'
   API_ARTIFACT_NAME: 'api-artifact'
+  WEB_ARTIFACT_NAME: 'web-artifact'
+  MIGRATION_ARTIFACT_NAME: 'ef-migrations'
+  MIGRATION_ARTIFACT_PATH: 'ef-migrations.sql'
+  MIGRATION_ARTIFACT_OUTPUT_PATH: './'
 
 jobs:
   ci:
@@ -38,9 +43,14 @@ jobs:
       API_PROJECT: "Presentation.WebApi.csproj"
       TEST_PATH: "Tests.Specs.Integration"
       TEST_PROJECT: "Tests.Specs.Integration.csproj"
+      WEB_PATH: "Presentation.Blazor"
+      WEB_PROJECT: "Presentation.Blazor.csproj"
+      INFRA_PATH: 'Infrastructure.SqlServer'
+      INFRA_PROJECT: 'Infrastructure.SqlServer.csproj'
+      INFRA_DBCONTEXT: 'PRODUCTContext'
       RUNTIME_ENV: "Development"
       CONFIGURATION: "Release"
-    name: "API CI"
+    name: "Web, API and SQL CI"
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || github.event_name == 'push'
     environment: development
@@ -94,7 +104,48 @@ jobs:
         run: |
           dotnet build ${{ env.SRC_PATH }}/${{ env.SRC_SLN }} --configuration ${{ env.CONFIGURATION }}
         shell: pwsh
-       
+
+      - name: Install dotnet-ef
+        run: |
+          dotnet tool install --global dotnet-ef
+          echo Home: $env:HOME
+          echo "GITHUB_PATH=$env:HOME/.dotnet/tools" >> $GITHUB_ENV
+        shell: pwsh
+
+      - name: Check for uncommitted EF Core model changes (diagnostic)
+        run: |
+          Write-Host "Working Directory: $(Get-Location)"
+          $tempDir = "${{ env.SRC_PATH }}/${{ env.INFRA_PATH }}/.temp-migrations"
+          if (Test-Path $tempDir) { Remove-Item -Recurse -Force $tempDir }
+          Write-Host "Running command: dotnet ef migrations add TempCheck --project ${{ env.SRC_PATH }}/${{ env.INFRA_PATH }}/${{ env.INFRA_PROJECT }} --startup-project ${{ env.SRC_PATH }}/${{ env.API_PATH }}/${{ env.API_PROJECT }} --context ${{ env.INFRA_DBCONTEXT }} --output-dir $tempDir"
+          dotnet ef migrations add TempCheck --project ${{ env.SRC_PATH }}/${{ env.INFRA_PATH }}/${{ env.INFRA_PROJECT }} --startup-project ${{ env.SRC_PATH }}/${{ env.API_PATH }}/${{ env.API_PROJECT }} --context ${{ env.INFRA_DBCONTEXT }} --output-dir $tempDir --configuration ${{ env.CONFIGURATION }} --no-build
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "::error::dotnet ef migrations add failed."
+            exit 1
+          }
+          if (Test-Path $tempDir) {
+            $files = Get-ChildItem -Path $tempDir
+            $files | ForEach-Object { Write-Host $_.FullName }
+            if ($files) {
+              Write-Host "::error::Uncommitted model changes detected! Please run 'dotnet ef migrations add' locally and commit the migration files."
+              Remove-Item -Recurse -Force $tempDir
+              exit 1
+            }
+            Remove-Item -Recurse -Force $tempDir
+          }
+        shell: pwsh
+
+      - name: Create ${{ env.INFRA_DBCONTEXT }} SQL Script
+        run: |
+          dotnet ef migrations script --project ${{ env.SRC_PATH }}/${{ env.INFRA_PATH }}/${{ env.INFRA_PROJECT }} --startup-project ${{ env.SRC_PATH }}/${{ env.API_PATH }}/${{ env.API_PROJECT }} --context ${{ env.INFRA_DBCONTEXT }} --output ${{ env.MIGRATION_ARTIFACT_PATH }} --idempotent --configuration ${{ env.CONFIGURATION }} --no-build
+        shell: pwsh
+
+      - name: Upload migration script
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.MIGRATION_ARTIFACT_NAME }}
+          path: ${{ env.MIGRATION_ARTIFACT_PATH }}
+        
       - name: Test
         run: |
           mkdir -p TestResults-${{ matrix.DOTNET_VERSION }}
@@ -119,6 +170,16 @@ jobs:
           name: ${{ env.API_ARTIFACT_NAME }}
           path: ${{ env.API_ARTIFACT_OUTPUT }}/**
 
+      - name: Pack Blazor artifact
+        run: |
+          dotnet publish ${{ env.SRC_PATH }}/${{ env.WEB_PATH }}/${{ env.WEB_PROJECT }} --configuration ${{ env.CONFIGURATION }} --no-build --output publish_blazor_output
+        shell: pwsh
+
+      - name: Upload Blazor artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.WEB_ARTIFACT_NAME }}
+          path: ${{ env.WEB_ARTIFACT_OUTPUT }}/**
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v4
@@ -139,7 +200,7 @@ jobs:
         if: ${{ always() }}
 
   cd:
-    name: "API CD"
+    name: "Web, API and SQL CD"
     runs-on: ubuntu-latest
     needs: ci
     if: |
@@ -150,9 +211,16 @@ jobs:
         DOTNET_VERSION: ["10.x"]
     env:
       AZURE_APIAPP_NAME: PRODUCT-dev-001-api
+      AZURE_WEBAPP_PACKAGE_PATH: '.'
+      AZURE_WEBAPP_NAME: PRODUCT-dev-001-web
       AZURE_RG_NAME: 'COMPANY-PRODUCT-dev-001-rg'
       APPI_NAME: 'PRODUCT-dev-001-appi'
+      SQL_NAME: 'PRODUCT-dev-001-sql'
+      SQLDB_NAME: 'PRODUCT-dev-001-sqldb'
       AZURE_CRED: '{"clientId":"${{ secrets.AZURE_CLIENT_ID }}","subscriptionId":"${{ secrets.SUBSCRIPTION_ID }}","tenantId":"${{ secrets.AZURE_TENANT_ID }}"}'
+      INFRA_PATH: 'Infrastructure.SqlServer'
+      INFRA_PROJECT: 'Infrastructure.SqlServer.csproj'
+      INFRA_DBCONTEXT: 'PRODUCTContext'
       RUNTIME_ENV: "Development"
 
     steps:
@@ -162,6 +230,19 @@ jobs:
           name: ${{ env.API_ARTIFACT_NAME }}
           path: ${{ env.API_ARTIFACT_OUTPUT }}
 
+      - name: Download Web Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ env.WEB_ARTIFACT_NAME }}
+          path: ${{ env.WEB_ARTIFACT_OUTPUT }}
+
+      - name: Download migration script
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ env.MIGRATION_ARTIFACT_NAME }}
+          path: ${{ env.MIGRATION_ARTIFACT_OUTPUT_PATH }}
+
+
       - name: az login
         uses: azure/login@v1
         with:
@@ -169,12 +250,32 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
+      - name: Get SQL connection string
+        id: get_sql_conn
+        run: |
+          $TEMP_STR=az sql db show-connection-string --client ado.net --server ${{ env.SQL_NAME }} --name ${{ env.SQLDB_NAME }} -o tsv
+          $TEMP_STR=$TEMP_STR.replace("<username>", "${{ secrets.SQL_ADMIN_USER }}")
+          $TEMP_STR=$TEMP_STR.replace("<password>", "${{ secrets.SQL_ADMIN_PASSWORD }}")
+          echo "CONN_STR=$TEMP_STR" >> $env:GITHUB_OUTPUT
+        shell: pwsh
+
+      - name: Deploy SQL script
+        uses: azure/sql-action@v2
+        with:
+          connection-string: ${{ steps.get_sql_conn.outputs.CONN_STR }}
+          path: ${{ env.MIGRATION_ARTIFACT_PATH }}
+
       - name: Deploy Web API to Azure App Service
         uses: azure/webapps-deploy@v2
         with:
           app-name: ${{ env.AZURE_APIAPP_NAME }}
           package: ${{ env.API_ARTIFACT_OUTPUT }}
 
+      - name: Deploy Blazor to Azure App Service
+        uses: azure/webapps-deploy@v2
+        with:
+          app-name: ${{ env.AZURE_WEBAPP_NAME }}
+          package: ${{ env.WEB_ARTIFACT_OUTPUT }}
 
       - name: ${{ env.AZURE_APIAPP_NAME }} app settings
         run: |
@@ -185,6 +286,11 @@ jobs:
           az webapp config appsettings set -g ${{ env.AZURE_RG_NAME }} -n ${{ env.AZURE_APIAPP_NAME }} --settings APPINSIGHTS_INSTRUMENTATIONKEY=$INSTR_KEY
           az webapp config appsettings set -g ${{ env.AZURE_RG_NAME }} -n ${{ env.AZURE_APIAPP_NAME }} --settings APPLICATIONINSIGHTS_CONNECTION_STRING=$CONN_STR
           az webapp config appsettings set -g ${{ env.AZURE_RG_NAME }} -n ${{ env.AZURE_APIAPP_NAME }} --settings ASPNETCORE_ENVIRONMENT=${{ env.RUNTIME_ENV }}
+        shell: pwsh
+
+      - name: ${{ env.AZURE_APIAPP_NAME }} connection strings
+        run: |
+          az webapp config connection-string set -g ${{ env.AZURE_RG_NAME }} -n ${{ env.AZURE_APIAPP_NAME }} -t SQLServer --settings DefaultConnection="${{ steps.get_sql_conn.outputs.CONN_STR }}"
         shell: pwsh
 
       - name: Swap to production slot
