@@ -30,14 +30,14 @@ env:
   # Shared Landing Zone
   SHARED_RG_NAME: "COMPANY-shared-dev-001-rg"
   SHARED_RG_LOCATION: "westus2"
-  SHARED_BICEP_TEMPLATE: ".azure/templates/landingzone-shared.bicep"
-  SHARED_BICEP_PARAMETERS: ".azure/variables/landingzone-shared-development.bicepparam"
+  SHARED_BICEP_TEMPLATE: ".azure/templates/platform-spoke-mgmt.bicep"
+  SHARED_BICEP_PARAMETERS: ".azure/variables/platform-spoke-mgmt-dev.bicepparam"
   # Product Landing Zone
   PRODUCT_RG_LOCATION: "westus2"
   PRODUCT_RG_NAME: "COMPANY-PRODUCT-dev-001-rg"
   KEYVAULT_NAME: "PRODUCT-dev-001-kv"
   PRODUCT_BICEP_TEMPLATE: ".azure/templates/landingzone-blazor-api-sql.bicep"
-  PRODUCT_BICEP_PARAMETERS: ".azure/variables/landingzone-blazor-api-sql-development.bicepparam"
+  PRODUCT_BICEP_PARAMETERS: ".azure/variables/landingzone-blazor-api-sql-dev.bicepparam"
 
 permissions:
   id-token: write
