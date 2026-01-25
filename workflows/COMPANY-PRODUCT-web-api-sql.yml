@@ -200,7 +200,7 @@ jobs:
         if: ${{ always() }}
 
   cd:
-    name: "Web, API and SQL CI"
+    name: "Web, API and SQL CD"
     runs-on: ubuntu-latest
     needs: ci
     if: |
