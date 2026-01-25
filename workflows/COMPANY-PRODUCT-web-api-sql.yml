@@ -26,7 +26,7 @@ permissions:
 
 env:
   API_ARTIFACT_OUTPUT: 'publish_output'
-  WEB_ARTIFACT_OUTPUT: 'publish_blazor_output'
+  WEB_ARTIFACT_OUTPUT: 'publish_web_output'
   API_ARTIFACT_NAME: 'api-artifact'
   WEB_ARTIFACT_NAME: 'web-artifact'
   MIGRATION_ARTIFACT_NAME: 'ef-migrations'
@@ -172,7 +172,7 @@ jobs:
 
       - name: Pack Blazor artifact
         run: |
-          dotnet publish ${{ env.SRC_PATH }}/${{ env.WEB_PATH }}/${{ env.WEB_PROJECT }} --configuration ${{ env.CONFIGURATION }} --no-build --output publish_blazor_output
+          dotnet publish ${{ env.SRC_PATH }}/${{ env.WEB_PATH }}/${{ env.WEB_PROJECT }} --configuration ${{ env.CONFIGURATION }} --no-build --output publish_web_output
         shell: pwsh
 
       - name: Upload Blazor artifact

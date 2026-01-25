@@ -1,4 +1,4 @@
-name: 'IaC Deploy: What-if and deploy landing zone'
+name: 'Digital Insights IaC'
 
 on:
   push:
@@ -28,7 +28,7 @@ on:
 env:
   DOTNET_SYSTEM_GLOBALIZATION_INVARIANT: "true"
   # Shared Landing Zone
-  SHARED_RG_NAME: "COMPANY-shared-dev-001-rg"
+  SHARED_RG_NAME: "COMPANY-platmgmt-dev-001-rg"
   SHARED_RG_LOCATION: "westus2"
   SHARED_BICEP_TEMPLATE: ".azure/templates/platform-spoke-mgmt.bicep"
   SHARED_BICEP_PARAMETERS: ".azure/variables/platform-spoke-mgmt-dev.bicepparam"
@@ -36,8 +36,8 @@ env:
   PRODUCT_RG_LOCATION: "westus2"
   PRODUCT_RG_NAME: "COMPANY-PRODUCT-dev-001-rg"
   KEYVAULT_NAME: "PRODUCT-dev-001-kv"
-  PRODUCT_BICEP_TEMPLATE: ".azure/templates/landingzone-blazor-api-sql.bicep"
-  PRODUCT_BICEP_PARAMETERS: ".azure/variables/landingzone-blazor-api-sql-dev.bicepparam"
+  PRODUCT_BICEP_TEMPLATE: ".azure/templates/landingzone-web-api-sql.bicep"
+  PRODUCT_BICEP_PARAMETERS: ".azure/variables/landingzone-web-api-sql-dev.bicepparam"
 
 permissions:
   id-token: write
@@ -45,9 +45,10 @@ permissions:
   security-events: write
 
 jobs:
-  development_Stage_deploy_landing_zone:
-    name: "Deploy landing zone IaC"
+  ci:
+    name: "Validate landing zone IaC"
     runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || github.event_name == 'push'
     environment: development
     steps:
       - name: Checkout
@@ -60,7 +61,6 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      # SHARED RG
       - name: Create ${{ env.SHARED_RG_NAME }}
         uses: Azure/cli@v2.1.0
         with:
@@ -73,13 +73,6 @@ jobs:
           inlineScript: |
             az deployment group what-if --resource-group ${{ env.SHARED_RG_NAME }} --template-file ${{ env.SHARED_BICEP_TEMPLATE }} --parameters ${{ env.SHARED_BICEP_PARAMETERS }}
 
-      - name: Deploy ${{ env.SHARED_RG_NAME }}
-        uses: Azure/cli@v2.1.0
-        with:
-          inlineScript: |
-            az deployment group create --resource-group ${{ env.SHARED_RG_NAME }} --template-file ${{ env.SHARED_BICEP_TEMPLATE }} --parameters ${{ env.SHARED_BICEP_PARAMETERS }}
-
-      # PRODUCT RG
       - name: Create ${{ env.PRODUCT_RG_NAME }}
         uses: Azure/cli@v2.1.0
         with:
@@ -91,9 +84,33 @@ jobs:
         with:
           inlineScript: |
             az deployment group what-if --resource-group ${{ env.PRODUCT_RG_NAME }} --template-file ${{ env.PRODUCT_BICEP_TEMPLATE }} --parameters ${{ env.PRODUCT_BICEP_PARAMETERS }} --parameters sqlAdminUser=${{ secrets.SQL_ADMIN_USER }} sqlAdminPassword=${{ secrets.SQL_ADMIN_PASSWORD }}
+ 
+  cd:
+    name: "Deploy landing zone IaC"
+    runs-on: ubuntu-latest
+    needs: ci
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    environment: development
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: "Az CLI login"
+        uses: azure/login@v1
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy ${{ env.SHARED_RG_NAME }}
+        uses: Azure/cli@v2.1.0
+        with:
+          inlineScript: |
+            az deployment group create --resource-group ${{ env.SHARED_RG_NAME }} --template-file ${{ env.SHARED_BICEP_TEMPLATE }} --parameters ${{ env.SHARED_BICEP_PARAMETERS }}
 
       - name: Deploy ${{ env.PRODUCT_RG_NAME }}
         uses: Azure/cli@v2.1.0
         with:
           inlineScript: |
             az deployment group create --resource-group ${{ env.PRODUCT_RG_NAME }} --template-file ${{ env.PRODUCT_BICEP_TEMPLATE }} --parameters ${{ env.PRODUCT_BICEP_PARAMETERS }} --parameters sqlAdminUser=${{ secrets.SQL_ADMIN_USER }} sqlAdminPassword=${{ secrets.SQL_ADMIN_PASSWORD }}
+  
