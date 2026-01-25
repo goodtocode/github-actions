@@ -1,4 +1,4 @@
-name: 'Digital Insights CI/CD'
+name: 'PRODUCT CI/CD'
 on:
   pull_request:
     branches:
@@ -18,10 +18,6 @@ on:
         description: "Environment to run"
         required: true
         default: "development"
-      run_cd:
-        description: "Run CD (deploy) steps"
-        required: false
-        default: "false"
 
 permissions:
   id-token: write
@@ -112,7 +108,8 @@ jobs:
       - name: Install dotnet-ef
         run: |
           dotnet tool install --global dotnet-ef
-          echo "GITHUB_PATH=$(HOME)/.dotnet/tools" >> $GITHUB_ENV
+          echo Home: $env:HOME
+          echo "GITHUB_PATH=$env:HOME/.dotnet/tools" >> $GITHUB_ENV
         shell: pwsh
 
       - name: Check for uncommitted EF Core model changes (diagnostic)
@@ -207,8 +204,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: ci
     if: |
-      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
-      (github.event_name == 'workflow_dispatch' && github.event.inputs.run_cd == 'true')
+      (github.event_name == 'push' && github.ref == 'refs/heads/main')
     environment: development
     strategy:
       matrix:
@@ -246,6 +242,7 @@ jobs:
           name: ${{ env.MIGRATION_ARTIFACT_NAME }}
           path: ${{ env.MIGRATION_ARTIFACT_OUTPUT_PATH }}
 
+
       - name: az login
         uses: azure/login@v1
         with:
@@ -253,10 +250,20 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Apply migration script
+      - name: Get SQL connection string
+        id: get_sql_conn
         run: |
-          az sql db execute --name ${{ env.SQLDB_NAME }} --resource-group ${{ env.AZURE_RG_NAME }} --server ${{ env.SQL_NAME }} --script-file ef-migrations.sql
+          $TEMP_STR=az sql db show-connection-string --client ado.net --server ${{ env.SQL_NAME }} --name ${{ env.SQLDB_NAME }} -o tsv
+          $TEMP_STR=$TEMP_STR.replace("<username>", "${{ secrets.SQL_ADMIN_USER }}")
+          $TEMP_STR=$TEMP_STR.replace("<password>", "${{ secrets.SQL_ADMIN_PASSWORD }}")
+          echo "CONN_STR=$TEMP_STR" >> $env:GITHUB_OUTPUT
         shell: pwsh
+
+      - name: Deploy SQL script
+        uses: azure/sql-action@v2
+        with:
+          connection-string: ${{ steps.get_sql_conn.outputs.CONN_STR }}
+          path: ${{ env.MIGRATION_ARTIFACT_PATH }}
 
       - name: Deploy Web API to Azure App Service
         uses: azure/webapps-deploy@v2
@@ -283,10 +290,7 @@ jobs:
 
       - name: ${{ env.AZURE_APIAPP_NAME }} connection strings
         run: |
-          $TEMP_STR=az sql db show-connection-string --client ado.net --server ${{ env.SQL_NAME }} --name ${{ env.SQLDB_NAME }} -o tsv
-          $TEMP_STR=$TEMP_STR.replace("<username>", "${{ secrets.SQL_ADMIN_USER }}")
-          $TEMP_STR=$TEMP_STR.replace("<password>", "${{ secrets.SQL_ADMIN_PASSWORD }}")
-          az webapp config connection-string set -g ${{ env.AZURE_RG_NAME }} -n ${{ env.AZURE_APIAPP_NAME }} -t SQLServer --settings DefaultConnection=$TEMP_STR
+          az webapp config connection-string set -g ${{ env.AZURE_RG_NAME }} -n ${{ env.AZURE_APIAPP_NAME }} -t SQLServer --settings DefaultConnection="${{ steps.get_sql_conn.outputs.CONN_STR }}"
         shell: pwsh
 
       - name: Swap to production slot
