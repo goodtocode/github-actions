@@ -288,6 +288,7 @@ jobs:
           az webapp config appsettings set -g ${{ env.AZURE_RG_NAME }} -n ${{ env.AZURE_APIAPP_NAME }} --settings APPINSIGHTS_INSTRUMENTATIONKEY=$INSTR_KEY
           az webapp config appsettings set -g ${{ env.AZURE_RG_NAME }} -n ${{ env.AZURE_APIAPP_NAME }} --settings APPLICATIONINSIGHTS_CONNECTION_STRING=$CONN_STR
           az webapp config appsettings set -g ${{ env.AZURE_RG_NAME }} -n ${{ env.AZURE_APIAPP_NAME }} --settings ASPNETCORE_ENVIRONMENT=${{ env.RUNTIME_ENV }}
+          az webapp config appsettings set -g ${{ env.AZURE_RG_NAME }} -n ${{ env.AZURE_APIAPP_NAME }} --settings OpenAI:ApiKey=${{ secrets.OPENAI_APIKEY }}
         shell: pwsh
 
       - name: ${{ env.AZURE_APIAPP_NAME }} connection strings
