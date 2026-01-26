@@ -26,6 +26,7 @@ permissions:
   security-events: write
 
 env:
+  CONFIGURATION: "Release"
   SCRIPTS_PATH: "./.github/scripts"
   SRC_PATH: "./src"
   PROJECT_PATH: "COMPANY.PRODUCT"
@@ -33,6 +34,7 @@ env:
   SRC_SLN: "COMPANY.PRODUCT.sln"
   TEST_PATH: "COMPANY.PRODUCT.Tests"
   TEST_PROJECT: "COMPANY.PRODUCT.Tests.csproj"
+
 jobs:
   ci:
     name: "NuGet CI"
@@ -42,9 +44,11 @@ jobs:
     strategy:
       matrix:
         DOTNET_VERSION: ["10.x"]
-
     env:
       RUNTIME_ENV: "Development"
+      CONFIGURATION: "Release"
+      VERSION_MAJOR: '1'
+      VERSION_MINOR: '1'
 
     steps:
       - name: checkout
@@ -56,16 +60,19 @@ jobs:
           dotnet-version: ${{ matrix.DOTNET_VERSION }}
 
       - name: Get Semantic Version
-        id: get_semver
+        id: get_version
         run: |
-          $json = & "${{ env.SCRIPTS_PATH }}/ci/Get-Version.ps1" -Major 1 -Minor 1 -Patch $env:GITHUB_RUN_NUMBER
-          $semver = ($json | ConvertFrom-Json).SemanticVersion
-          echo "SEMANTIC_VERSION=$semver" >> $env:GITHUB_OUTPUT
+          $json = & "${{ env.SCRIPTS_PATH }}/ci/Get-Version.ps1" -Major ${{ env.VERSION_MAJOR }} -Minor ${{ env.VERSION_MINOR }} -Patch $env:GITHUB_RUN_NUMBER
+          $versionObj = ($json | ConvertFrom-Json)
+          echo "SEMANTIC_VERSION=$($versionObj.SemanticVersion)" >> $env:GITHUB_OUTPUT
+          echo "FILE_VERSION=$($versionObj.FileVersion)" >> $env:GITHUB_OUTPUT
+          echo "ASSEMBLY_VERSION=$($versionObj.AssemblyVersion)" >> $env:GITHUB_OUTPUT
+          echo "INFORMATIONAL_VERSION=$($versionObj.InformationalVersion)" >> $env:GITHUB_OUTPUT
         shell: pwsh
 
       - name: Set-Version.ps1
         run: |
-          $version = ${{ env.SCRIPTS_PATH }}/ci/Set-Version.ps1 -Path ${{ env.SRC_PATH }} -VersionToReplace 1.0.0 -Major 1 -Minor 1
+          $version = ${{ env.SCRIPTS_PATH }}/ci/Set-Version.ps1 -Path ${{ env.SRC_PATH }} -VersionToReplace 1.0.0 -Major ${{ env.VERSION_MAJOR }} -Minor ${{ env.VERSION_MINOR }} -Patch $env:GITHUB_RUN_NUMBER
           echo $version
           echo "VERSION=$version" >> $GITHUB_ENV
         shell: pwsh
@@ -82,7 +89,7 @@ jobs:
 
       - name: Build
         run: |
-          dotnet build ${{ env.SRC_PATH }}/${{ env.SRC_SLN }} --configuration Release
+          dotnet build ${{ env.SRC_PATH }}/${{ env.SRC_SLN }} --configuration ${{ env.CONFIGURATION }}
         shell: pwsh
 
       - name: Test
@@ -100,7 +107,7 @@ jobs:
 
       - name: Pack NuGet package
         run: |
-          dotnet pack ${{ env.SRC_PATH }}/${{ env.PROJECT_PATH }}/${{ env.PROJECT_FILE }} --configuration Release --no-build --output nupkg_output --version ${{ steps.get_semver.outputs.SEMANTIC_VERSION }}
+          dotnet pack ${{ env.SRC_PATH }}/${{ env.PROJECT_PATH }}/${{ env.PROJECT_FILE }} --configuration ${{ env.CONFIGURATION }} --no-build --output nupkg_output --version ${{ steps.get_version.outputs.SEMANTIC_VERSION }}
         shell: pwsh
 
       - name: Upload NuGet package artifact
