@@ -35,6 +35,13 @@ env:
 
 jobs:
   ci:
+    name: "Web, API and SQL CI"
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || github.event_name == 'push'
+    environment: development
+    strategy:
+      matrix:
+        DOTNET_VERSION: ["10.x"]
     env:
       SCRIPTS_PATH: "./.github/scripts"
       SRC_PATH: "./src"
@@ -50,14 +57,9 @@ jobs:
       INFRA_DBCONTEXT: 'PRODUCTContext'
       RUNTIME_ENV: "Development"
       CONFIGURATION: "Release"
-    name: "Web, API and SQL CI"
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || github.event_name == 'push'
-    environment: development
-    strategy:
-      matrix:
-        DOTNET_VERSION: ["10.x"]
-    # env: RUNTIME_ENV now global
+      VERSION_MAJOR: '1'
+      VERSION_MINOR: '1'
+
     steps:
       - name: checkout
         uses: actions/checkout@v3
@@ -68,16 +70,19 @@ jobs:
           dotnet-version: ${{ matrix.DOTNET_VERSION }}
 
       - name: Get Semantic Version
-        id: get_semver
+        id: get_version
         run: |
-          $json = & "${{ env.SCRIPTS_PATH }}/ci/Get-Version.ps1" -Major 1 -Minor 1 -Patch $env:GITHUB_RUN_NUMBER
-          $semver = ($json | ConvertFrom-Json).SemanticVersion
-          echo "SEMANTIC_VERSION=$semver" >> $env:GITHUB_OUTPUT
+          $json = & "${{ env.SCRIPTS_PATH }}/ci/Get-Version.ps1" -Major ${{ env.VERSION_MAJOR }} -Minor ${{ env.VERSION_MINOR }} -Patch $env:GITHUB_RUN_NUMBER
+          $versionObj = ($json | ConvertFrom-Json)
+          echo "SEMANTIC_VERSION=$($versionObj.SemanticVersion)" >> $env:GITHUB_OUTPUT
+          echo "FILE_VERSION=$($versionObj.FileVersion)" >> $env:GITHUB_OUTPUT
+          echo "ASSEMBLY_VERSION=$($versionObj.AssemblyVersion)" >> $env:GITHUB_OUTPUT
+          echo "INFORMATIONAL_VERSION=$($versionObj.InformationalVersion)" >> $env:GITHUB_OUTPUT
         shell: pwsh
 
       - name: Set-Version.ps1
         run: |
-          $version = ${{ env.SCRIPTS_PATH }}/ci/Set-Version.ps1 -Path ${{ env.SRC_PATH }} -VersionToReplace 1.0.0 -Major 1 -Minor 1
+          $version = ${{ env.SCRIPTS_PATH }}/ci/Set-Version.ps1 -Path ${{ env.SRC_PATH }} -VersionToReplace 1.0.0 -Major ${{ env.VERSION_MAJOR }} -Minor ${{ env.VERSION_MINOR }} -Patch $env:GITHUB_RUN_NUMBER
           echo $version
           echo "VERSION=$version" >> $GITHUB_ENV
         shell: pwsh

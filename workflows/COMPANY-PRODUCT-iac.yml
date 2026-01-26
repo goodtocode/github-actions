@@ -27,7 +27,6 @@ on:
 
 env:
   DOTNET_SYSTEM_GLOBALIZATION_INVARIANT: "true"
-   
   
   # Shared Landing Zone
   PLATFORM_SUB_ID: "${{ secrets.PLATFORM_SUBSCRIPTION_ID }}"  
