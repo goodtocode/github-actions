@@ -22,8 +22,6 @@ on:
         description: "Environment to run"
         required: true
         default: "development"
-      mode:
-        description: "Running mode"
 
 env:
   DOTNET_SYSTEM_GLOBALIZATION_INVARIANT: "true"
