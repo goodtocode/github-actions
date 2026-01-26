@@ -30,12 +30,12 @@ env:
   
   # Shared Landing Zone
   PLATFORM_SUB_ID: "${{ secrets.PLATFORM_SUBSCRIPTION_ID }}"  
-  SPOKE_MGMT_RG_NAME: "COMPANY-spokemgmt-dev-001-rg"
+  SPOKE_MGMT_RG_NAME: "COMPANY-spokemgmt-dev-wus2-001-rg"
   SPOKE_MGMT_RG_LOCATION: "westus2"
   SPOKE_BICEP_TEMPLATE: ".azure/templates/platform-spoke-mgmt.bicep"
   SPOKE_BICEP_PARAMETERS: ".azure/variables/platform-spoke-mgmt-dev.bicepparam"
   # Product Landing Zone  
-  PRODUCT_RG_NAME: "COMPANY-PRODUCT-dev-001-rg"
+  PRODUCT_RG_NAME: "COMPANY-PRODUCT-dev-wus2-001-rg"
   PRODUCT_RG_LOCATION: "westus2"
   PRODUCT_BICEP_TEMPLATE: ".azure/templates/landingzone-web-api-sql.bicep"
   PRODUCT_BICEP_PARAMETERS: ".azure/variables/landingzone-web-api-sql-dev.bicepparam"

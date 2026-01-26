@@ -215,13 +215,13 @@ jobs:
       matrix:
         DOTNET_VERSION: ["10.x"]
     env:
-      AZURE_APIAPP_NAME: PRODUCT-dev-001-api
+      AZURE_APIAPP_NAME: PRODUCT-dev-wus2-001-api
       AZURE_WEBAPP_PACKAGE_PATH: '.'
-      AZURE_WEBAPP_NAME: PRODUCT-dev-001-web
-      AZURE_RG_NAME: 'COMPANY-PRODUCT-dev-001-rg'
-      APPI_NAME: 'PRODUCT-dev-001-appi'
-      SQL_NAME: 'PRODUCT-dev-001-sql'
-      SQLDB_NAME: 'PRODUCT-dev-001-sqldb'
+      AZURE_WEBAPP_NAME: PRODUCT-dev-wus2-001-web
+      AZURE_RG_NAME: 'COMPANY-PRODUCT-dev-wus2-001-rg'
+      APPI_NAME: 'PRODUCT-dev-wus2-001-appi'
+      SQL_NAME: 'PRODUCT-dev-wus2-001-sql'
+      SQLDB_NAME: 'PRODUCT-dev-wus2-001-sqldb'
       AZURE_CRED: '{"clientId":"${{ secrets.AZURE_CLIENT_ID }}","subscriptionId":"${{ secrets.SUBSCRIPTION_ID }}","tenantId":"${{ secrets.AZURE_TENANT_ID }}"}'
       INFRA_PATH: 'Infrastructure.SqlServer'
       INFRA_PROJECT: 'Infrastructure.SqlServer.csproj'
