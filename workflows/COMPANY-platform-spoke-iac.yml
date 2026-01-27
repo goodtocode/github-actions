@@ -25,7 +25,6 @@ on:
 
 env:
   DOTNET_SYSTEM_GLOBALIZATION_INVARIANT: "true"
-  PLATFORM_SUB_ID: "${{ secrets.PLATFORM_SUBSCRIPTION_ID }}"  
   SPOKE_LOCATION: "westus2"
   SPOKE_NETWORK_RG_NAME: "COMPANY-spokenetwork-dev-wus2-001-rg"
   SPOKE_NETWORK_BICEP_TEMPLATE: ".azure/templates/platform-spoke-network-publicroute.bicep"
@@ -54,13 +53,14 @@ jobs:
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.PLATFORM_SUBSCRIPTION_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: Create ${{ env.SPOKE_NETWORK_RG_NAME }}
         uses: Azure/cli@v2.1.0
         with:
           inlineScript: |
             az group create -n ${{ env.SPOKE_NETWORK_RG_NAME }} -l ${{ env.SPOKE_LOCATION }}
+
       - name: Validate ${{ env.SPOKE_NETWORK_RG_NAME }}
         uses: Azure/cli@v2.1.0
         with:
@@ -72,6 +72,7 @@ jobs:
         with:
           inlineScript: |
             az group create -n ${{ env.SPOKE_MGMT_RG_NAME }} -l ${{ env.SPOKE_LOCATION }}
+
       - name: Validate ${{ env.SPOKE_MGMT_RG_NAME }}
         uses: Azure/cli@v2.1.0
         with:
@@ -93,14 +94,15 @@ jobs:
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.PLATFORM_SUBSCRIPTION_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: Create ${{ env.SPOKE_NETWORK_RG_NAME }}
         uses: Azure/cli@v2.1.0
         with:
           inlineScript: |
             az group create -n ${{ env.SPOKE_NETWORK_RG_NAME }} -l ${{ env.SPOKE_LOCATION }}
-      - name: Validate ${{ env.SPOKE_NETWORK_RG_NAME }}
+
+      - name: Deploy ${{ env.SPOKE_NETWORK_RG_NAME }}
         uses: Azure/cli@v2.1.0
         with:
           inlineScript: |
@@ -112,7 +114,7 @@ jobs:
           inlineScript: |
             az group create -n ${{ env.SPOKE_MGMT_RG_NAME }} -l ${{ env.SPOKE_LOCATION }}
 
-      - name: Validate ${{ env.SPOKE_MGMT_RG_NAME }}
+      - name: Deploy ${{ env.SPOKE_MGMT_RG_NAME }}
         uses: Azure/cli@v2.1.0
         with:
           inlineScript: |

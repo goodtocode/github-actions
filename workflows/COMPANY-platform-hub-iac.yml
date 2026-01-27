@@ -25,14 +25,10 @@ on:
 
 env:
   DOTNET_SYSTEM_GLOBALIZATION_INVARIANT: "true"
-  
-  # Hub Landing Zone
-  PLATFORM_SUB_ID: "${{ secrets.PLATFORM_SUBSCRIPTION_ID }}"  
   HUB_LOCATION: "westus2"
   HUB_NETWORK_RG_NAME: "COMPANY-hubnetwork-plat-wus2-001-rg"
   HUB_NETWORK_BICEP_TEMPLATE: ".azure/templates/platform-hub-network-publicroute.bicep"
   HUB_NETWORK_BICEP_PARAMETERS: ".azure/variables/platform-hub-network-publicroute-plat.bicepparam"
-  
   HUB_MGMT_RG_NAME: "COMPANY-hubmgmt-plat-wus2-001-rg"
   HUB_MGMT_BICEP_TEMPLATE: ".azure/templates/platform-hub-mgmt.bicep"
   HUB_MGMT_BICEP_PARAMETERS: ".azure/variables/platform-hub-mgmt-plat.bicepparam"
@@ -106,7 +102,7 @@ jobs:
           inlineScript: |
             az group create -n ${{ env.HUB_NETWORK_RG_NAME }} -l ${{ env.HUB_LOCATION }}
 
-      - name: Validate ${{ env.HUB_NETWORK_RG_NAME }}
+      - name: Deploy ${{ env.HUB_NETWORK_RG_NAME }}
         uses: Azure/cli@v2.1.0
         with:
           inlineScript: |
@@ -118,7 +114,7 @@ jobs:
           inlineScript: |
             az group create -n ${{ env.HUB_MGMT_RG_NAME }} -l ${{ env.HUB_LOCATION }}
 
-      - name: Validate ${{ env.HUB_MGMT_RG_NAME }}
+      - name: Deploy ${{ env.HUB_MGMT_RG_NAME }}
         uses: Azure/cli@v2.1.0
         with:
           inlineScript: |
