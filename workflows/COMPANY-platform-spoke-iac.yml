@@ -65,7 +65,7 @@ jobs:
         uses: Azure/cli@v2.1.0
         with:
           inlineScript: |
-            az deployment group what-if --resource-group ${{ env.SPOKE_NETWORK_RG_NAME }} --template-file ${{ env.SPOKE_NETWORK_BICEP_TEMPLATE }} --parameters ${{ env.SPOKE_NETWORK_BICEP_PARAMETERS }} --parameters hubMgmtSubscriptionId=${{ secrets.PLATFORM_SUBSCRIPTION_ID }} 
+            az deployment group what-if --resource-group ${{ env.SPOKE_NETWORK_RG_NAME }} --template-file ${{ env.SPOKE_NETWORK_BICEP_TEMPLATE }} --parameters ${{ env.SPOKE_NETWORK_BICEP_PARAMETERS }}
 
       - name: Create ${{ env.SPOKE_MGMT_RG_NAME }}
         uses: Azure/cli@v2.1.0
@@ -77,7 +77,7 @@ jobs:
         uses: Azure/cli@v2.1.0
         with:
           inlineScript: |
-            az deployment group what-if --resource-group ${{ env.SPOKE_MGMT_RG_NAME }} --template-file ${{ env.SPOKE_MGMT_BICEP_TEMPLATE }} --parameters ${{ env.SPOKE_MGMT_BICEP_PARAMETERS }} --parameters hubMgmtSubscriptionId=${{ secrets.PLATFORM_SUBSCRIPTION_ID }} 
+            az deployment group what-if --resource-group ${{ env.SPOKE_MGMT_RG_NAME }} --template-file ${{ env.SPOKE_MGMT_BICEP_TEMPLATE }} --parameters ${{ env.SPOKE_MGMT_BICEP_PARAMETERS }}
 
   cd:
     name: "Deploy landing zone IaC"
@@ -106,7 +106,7 @@ jobs:
         uses: Azure/cli@v2.1.0
         with:
           inlineScript: |
-            az deployment group create --resource-group ${{ env.SPOKE_NETWORK_RG_NAME }} --template-file ${{ env.SPOKE_NETWORK_BICEP_TEMPLATE }} --parameters ${{ env.SPOKE_NETWORK_BICEP_PARAMETERS }} --parameters hubMgmtSubscriptionId=${{ secrets.PLATFORM_SUBSCRIPTION_ID }} 
+            az deployment group create --resource-group ${{ env.SPOKE_NETWORK_RG_NAME }} --template-file ${{ env.SPOKE_NETWORK_BICEP_TEMPLATE }} --parameters ${{ env.SPOKE_NETWORK_BICEP_PARAMETERS }}
 
       - name: Create ${{ env.SPOKE_MGMT_RG_NAME }}
         uses: Azure/cli@v2.1.0
@@ -118,4 +118,4 @@ jobs:
         uses: Azure/cli@v2.1.0
         with:
           inlineScript: |
-            az deployment group create --resource-group ${{ env.SPOKE_MGMT_RG_NAME }} --template-file ${{ env.SPOKE_MGMT_BICEP_TEMPLATE }} --parameters ${{ env.SPOKE_MGMT_BICEP_PARAMETERS }} --parameters hubMgmtSubscriptionId=${{ secrets.PLATFORM_SUBSCRIPTION_ID }} 
+            az deployment group create --resource-group ${{ env.SPOKE_MGMT_RG_NAME }} --template-file ${{ env.SPOKE_MGMT_BICEP_TEMPLATE }} --parameters ${{ env.SPOKE_MGMT_BICEP_PARAMETERS }}
