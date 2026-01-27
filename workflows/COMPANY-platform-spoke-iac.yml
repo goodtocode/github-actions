@@ -5,7 +5,7 @@ on:
     branches-ignore:
       - main
     paths:
-      - .github/workflows/COMPANY-spoke-iac.yml
+      - .github/workflows/COMPANY-platform-spoke-iac.yml
       - .azure/**/*.bicep
       - .azure/**/*.bicepparams
   pull_request:
@@ -13,7 +13,7 @@ on:
     branches:
       - main
     paths:
-      - .github/workflows/COMPANY-spoke-iac.yml
+      - .github/workflows/COMPANY-platform-spoke-iac.yml
       - .azure/**/*.bicep
       - .azure/**/*.bicepparams
   workflow_dispatch:
