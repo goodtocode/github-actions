@@ -1,4 +1,4 @@
-name: 'PRODUCT CI/CD'
+name: 'API & SQL CI/CD'
 on:
   pull_request:
     branches:

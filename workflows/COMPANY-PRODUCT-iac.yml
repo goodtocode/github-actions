@@ -1,4 +1,4 @@
-name: 'Digital Insights IaC'
+name: 'Landing Zone IaC'
 
 on:
   push:

@@ -1,4 +1,4 @@
-name: 'Digital Insights IaC'
+name: 'Platform Spoke IaC'
 
 on:
   push:
