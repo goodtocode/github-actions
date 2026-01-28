@@ -25,6 +25,7 @@ on:
 
 env:
   DOTNET_SYSTEM_GLOBALIZATION_INVARIANT: "true"
+  HUB_MGMT_RG_NAME: "COMPANY-hubmgmt-dev-wus2-001-rg"
   SPOKE_LOCATION: "westus2"
   SPOKE_NETWORK_RG_NAME: "COMPANY-spokenetwork-dev-wus2-001-rg"
   SPOKE_NETWORK_BICEP_TEMPLATE: ".azure/templates/platform-spoke-network-publicroute.bicep"
@@ -77,7 +78,7 @@ jobs:
         uses: Azure/cli@v2.1.0
         with:
           inlineScript: |
-            az deployment group what-if --resource-group ${{ env.SPOKE_MGMT_RG_NAME }} --template-file ${{ env.SPOKE_MGMT_BICEP_TEMPLATE }} --parameters ${{ env.SPOKE_MGMT_BICEP_PARAMETERS }}
+            az deployment group what-if --resource-group ${{ env.SPOKE_MGMT_RG_NAME }} --template-file ${{ env.SPOKE_MGMT_BICEP_TEMPLATE }} --parameters ${{ env.SPOKE_MGMT_BICEP_PARAMETERS }} --parameters hubMgmtSubscriptionId=${{ secrets.PLATFORM_SUBSCRIPTION_ID }} hubMgmtResourceGroupName=${{ env.HUB_MGMT_RG_NAME }}
 
   cd:
     name: "Deploy landing zone IaC"
@@ -118,4 +119,4 @@ jobs:
         uses: Azure/cli@v2.1.0
         with:
           inlineScript: |
-            az deployment group create --resource-group ${{ env.SPOKE_MGMT_RG_NAME }} --template-file ${{ env.SPOKE_MGMT_BICEP_TEMPLATE }} --parameters ${{ env.SPOKE_MGMT_BICEP_PARAMETERS }}
+            az deployment group create --resource-group ${{ env.SPOKE_MGMT_RG_NAME }} --template-file ${{ env.SPOKE_MGMT_BICEP_TEMPLATE }} --parameters ${{ env.SPOKE_MGMT_BICEP_PARAMETERS }} --parameters hubMgmtSubscriptionId=${{ secrets.PLATFORM_SUBSCRIPTION_ID }} hubMgmtResourceGroupName=${{ env.HUB_MGMT_RG_NAME }}
