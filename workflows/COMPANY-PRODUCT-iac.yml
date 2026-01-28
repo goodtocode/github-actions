@@ -66,7 +66,7 @@ jobs:
         uses: Azure/cli@v2.1.0
         with:
           inlineScript: |
-            az deployment group what-if --resource-group ${{ env.PRODUCT_RG_NAME }} --template-file ${{ env.PRODUCT_BICEP_TEMPLATE }} --parameters ${{ env.PRODUCT_BICEP_PARAMETERS }} --parameters sqlAdminUser=${{ secrets.SQL_ADMIN_USER }} sqlAdminPassword=${{ secrets.SQL_ADMIN_PASSWORD }}
+            az deployment group what-if --resource-group ${{ env.PRODUCT_RG_NAME }} --template-file ${{ env.PRODUCT_BICEP_TEMPLATE }} --parameters ${{ env.PRODUCT_BICEP_PARAMETERS }} --parameters sqlAdminUser=${{ secrets.SQL_ADMIN_USER }} sqlAdminPassword=${{ secrets.SQL_ADMIN_PASSWORD }} --parameters hubMgmtSubscriptionId=${{ secrets.PLATFORM_SUBSCRIPTION_ID }} hubMgmtResourceGroupName=${{ env.HUB_MGMT_RG_NAME }}
  
   cd:
     name: "Deploy landing zone IaC"
@@ -89,5 +89,5 @@ jobs:
         uses: Azure/cli@v2.1.0
         with:
           inlineScript: |
-            az deployment group create --resource-group ${{ env.PRODUCT_RG_NAME }} --template-file ${{ env.PRODUCT_BICEP_TEMPLATE }} --parameters ${{ env.PRODUCT_BICEP_PARAMETERS }} --parameters sqlAdminUser=${{ secrets.SQL_ADMIN_USER }} sqlAdminPassword=${{ secrets.SQL_ADMIN_PASSWORD }}
+            az deployment group create --resource-group ${{ env.PRODUCT_RG_NAME }} --template-file ${{ env.PRODUCT_BICEP_TEMPLATE }} --parameters ${{ env.PRODUCT_BICEP_PARAMETERS }} --parameters sqlAdminUser=${{ secrets.SQL_ADMIN_USER }} sqlAdminPassword=${{ secrets.SQL_ADMIN_PASSWORD }} --parameters hubMgmtSubscriptionId=${{ secrets.PLATFORM_SUBSCRIPTION_ID }} hubMgmtResourceGroupName=${{ env.HUB_MGMT_RG_NAME }}
   
