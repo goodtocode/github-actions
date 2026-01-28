@@ -214,11 +214,12 @@ jobs:
       matrix:
         DOTNET_VERSION: ["10.x"]
     env:
+      SPOKE_RG_NAME: 'COMPANY-spokemgmt-dev-wus2-001-rg'
+      APPI_NAME: 'spokemgmt-dev-wus2-001-appi'
       AZURE_APIAPP_NAME: PRODUCT-dev-wus2-001-api
       AZURE_WEBAPP_PACKAGE_PATH: '.'
       AZURE_WEBAPP_NAME: PRODUCT-dev-wus2-001-web
       AZURE_RG_NAME: 'COMPANY-PRODUCT-dev-wus2-001-rg'
-      APPI_NAME: 'PRODUCT-dev-wus2-001-appi'
       SQL_NAME: 'PRODUCT-dev-wus2-001-sql'
       SQLDB_NAME: 'PRODUCT-dev-wus2-001-sqldb'
       RUNTIME_ENV: "Development"
@@ -271,16 +272,10 @@ jobs:
           app-name: ${{ env.AZURE_APIAPP_NAME }}
           package: ${{ env.API_ARTIFACT_OUTPUT }}
 
-      - name: Deploy Blazor to Azure App Service
-        uses: azure/webapps-deploy@v2
-        with:
-          app-name: ${{ env.AZURE_WEBAPP_NAME }}
-          package: ${{ env.WEB_ARTIFACT_OUTPUT }}
-
       - name: ${{ env.AZURE_APIAPP_NAME }} app settings
         run: |
           az config set extension.use_dynamic_install=yes_without_prompt
-          $TEMP_JSON = az monitor app-insights component show -g ${{ env.AZURE_RG_NAME }} --app ${{ env.APPI_NAME }} | ConvertFrom-Json
+          $TEMP_JSON = az monitor app-insights component show -g ${{ env.SPOKE_RG_NAME }} --app ${{ env.APPI_NAME }} | ConvertFrom-Json
           $INSTR_KEY = $TEMP_JSON.instrumentationKey
           $CONN_STR = $TEMP_JSON.connectionString
           az webapp config appsettings set -g ${{ env.AZURE_RG_NAME }} -n ${{ env.AZURE_APIAPP_NAME }} --settings APPINSIGHTS_INSTRUMENTATIONKEY=$INSTR_KEY
@@ -292,6 +287,23 @@ jobs:
       - name: ${{ env.AZURE_APIAPP_NAME }} connection strings
         run: |
           az webapp config connection-string set -g ${{ env.AZURE_RG_NAME }} -n ${{ env.AZURE_APIAPP_NAME }} -t SQLServer --settings DefaultConnection="${{ steps.get_sql_conn.outputs.CONN_STR }}"
+        shell: pwsh
+
+      - name: Deploy ${{ env.AZURE_WEBAPP_NAME }}
+        uses: azure/webapps-deploy@v2
+        with:
+          app-name: ${{ env.AZURE_WEBAPP_NAME }}
+          package: ${{ env.WEB_ARTIFACT_OUTPUT }}
+
+      - name: ${{ env.AZURE_WEBAPP_NAME }} app settings
+        run: |
+          az config set extension.use_dynamic_install=yes_without_prompt
+          $TEMP_JSON = az monitor app-insights component show -g ${{ env.AZURE_RG_NAME }} --app ${{ env.APPI_NAME }} | ConvertFrom-Json
+          $INSTR_KEY = $TEMP_JSON.instrumentationKey
+          $CONN_STR = $TEMP_JSON.connectionString
+          az webapp config appsettings set -g ${{ env.AZURE_RG_NAME }} -n ${{ env.AZURE_WEBAPP_NAME }} --settings APPINSIGHTS_INSTRUMENTATIONKEY=$INSTR_KEY
+          az webapp config appsettings set -g ${{ env.AZURE_RG_NAME }} -n ${{ env.AZURE_WEBAPP_NAME }} --settings APPLICATIONINSIGHTS_CONNECTION_STRING=$CONN_STR
+          az webapp config appsettings set -g ${{ env.AZURE_RG_NAME }} -n ${{ env.AZURE_WEBAPP_NAME }} --settings ASPNETCORE_ENVIRONMENT=${{ env.RUNTIME_ENV }}
         shell: pwsh
 
       - name: Swap to production slot
