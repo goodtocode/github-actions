@@ -25,7 +25,6 @@ on:
 
 env:
   DOTNET_SYSTEM_GLOBALIZATION_INVARIANT: "true"
-  HUB_MGMT_RG_NAME: "COMPANY-hubmgmt-plat-wus2-001-rg"
   SPOKE_MGMT_RG_NAME: "COMPANY-spokemgmt-dev-wus2-001-rg"
   SPOKE_MGMT_RG_LOCATION: "westus2"
   SPOKE_BICEP_TEMPLATE: ".azure/templates/platform-spoke-mgmt.bicep"
