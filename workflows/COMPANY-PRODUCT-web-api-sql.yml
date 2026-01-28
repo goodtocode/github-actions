@@ -221,7 +221,6 @@ jobs:
       APPI_NAME: 'PRODUCT-dev-wus2-001-appi'
       SQL_NAME: 'PRODUCT-dev-wus2-001-sql'
       SQLDB_NAME: 'PRODUCT-dev-wus2-001-sqldb'
-      AZURE_CRED: '{"clientId":"${{ secrets.AZURE_CLIENT_ID }}","subscriptionId":"${{ secrets.SUBSCRIPTION_ID }}","tenantId":"${{ secrets.AZURE_TENANT_ID }}"}'
       RUNTIME_ENV: "Development"
 
     steps:
