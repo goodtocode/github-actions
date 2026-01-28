@@ -1,4 +1,4 @@
-name: 'Digital Insights IaC'
+name: 'Landing Zone IaC'
 
 on:
   push:
@@ -22,20 +22,14 @@ on:
         description: "Environment to run"
         required: true
         default: "development"
-      mode:
-        description: "Running mode"
 
 env:
   DOTNET_SYSTEM_GLOBALIZATION_INVARIANT: "true"
-  
-  # Shared Landing Zone
-  PLATFORM_SUB_ID: "${{ secrets.PLATFORM_SUBSCRIPTION_ID }}"  
-  SPOKE_MGMT_RG_NAME: "COMPANY-spokemgmt-dev-001-rg"
+  SPOKE_MGMT_RG_NAME: "COMPANY-spokemgmt-dev-wus2-001-rg"
   SPOKE_MGMT_RG_LOCATION: "westus2"
   SPOKE_BICEP_TEMPLATE: ".azure/templates/platform-spoke-mgmt.bicep"
   SPOKE_BICEP_PARAMETERS: ".azure/variables/platform-spoke-mgmt-dev.bicepparam"
-  # Product Landing Zone  
-  PRODUCT_RG_NAME: "COMPANY-PRODUCT-dev-001-rg"
+  PRODUCT_RG_NAME: "COMPANY-PRODUCT-dev-wus2-001-rg"
   PRODUCT_RG_LOCATION: "westus2"
   PRODUCT_BICEP_TEMPLATE: ".azure/templates/landingzone-web-api-sql.bicep"
   PRODUCT_BICEP_PARAMETERS: ".azure/variables/landingzone-web-api-sql-dev.bicepparam"
@@ -61,18 +55,6 @@ jobs:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-      - name: Create ${{ env.SPOKE_MGMT_RG_NAME }}
-        uses: Azure/cli@v2.1.0
-        with:
-          inlineScript: |
-            az group create -n ${{ env.SPOKE_MGMT_RG_NAME }} -l ${{ env.SPOKE_MGMT_RG_LOCATION }}
-
-      - name: Validate ${{ env.SPOKE_MGMT_RG_NAME }}
-        uses: Azure/cli@v2.1.0
-        with:
-          inlineScript: |
-            az deployment group what-if --resource-group ${{ env.SPOKE_MGMT_RG_NAME }} --template-file ${{ env.SPOKE_BICEP_TEMPLATE }} --parameters ${{ env.SPOKE_BICEP_PARAMETERS }} --parameters hubMgmtSubscriptionId=${{ secrets.PLATFORM_SUBSCRIPTION_ID }} 
 
       - name: Create ${{ env.PRODUCT_RG_NAME }}
         uses: Azure/cli@v2.1.0
@@ -102,12 +84,6 @@ jobs:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-      - name: Deploy ${{ env.SPOKE_MGMT_RG_NAME }}
-        uses: Azure/cli@v2.1.0
-        with:
-          inlineScript: |
-            az deployment group create --resource-group ${{ env.SPOKE_MGMT_RG_NAME }} --template-file ${{ env.SPOKE_BICEP_TEMPLATE }} --parameters ${{ env.SPOKE_BICEP_PARAMETERS }} --parameters hubMgmtSubscriptionId=${{ secrets.PLATFORM_SUBSCRIPTION_ID }} 
 
       - name: Deploy ${{ env.PRODUCT_RG_NAME }}
         uses: Azure/cli@v2.1.0
