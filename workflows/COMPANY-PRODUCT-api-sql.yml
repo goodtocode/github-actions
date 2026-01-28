@@ -56,7 +56,7 @@ jobs:
     strategy:
       matrix:
         DOTNET_VERSION: ["10.x"]
-    # env: RUNTIME_ENV now global
+
     steps:
       - name: checkout
         uses: actions/checkout@v3
@@ -195,8 +195,7 @@ jobs:
     name: "API and SQL Cd"
     runs-on: ubuntu-latest
     needs: ci
-    if: |
-      (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/main')
     environment: development
     strategy:
       matrix:
