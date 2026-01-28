@@ -1,4 +1,5 @@
 name: 'API & SQL CI/CD'
+
 on:
   pull_request:
     branches:
@@ -18,6 +19,10 @@ on:
         description: "Environment to run"
         required: true
         default: "development"
+      runcd:
+        description: "Run CD pipeline"
+        required: true
+        default: "false"
 
 permissions:
   id-token: write
@@ -195,7 +200,9 @@ jobs:
     name: "API and SQL Cd"
     runs-on: ubuntu-latest
     needs: ci
-    if: (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    if: |
+        (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+        (github.event_name == 'workflow_dispatch' && (github.event.inputs.runcd == 'true' || github.event.inputs.runcd == true))
     environment: development
     strategy:
       matrix:

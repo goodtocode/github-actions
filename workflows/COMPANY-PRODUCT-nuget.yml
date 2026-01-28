@@ -19,6 +19,10 @@ on:
         description: "Environment to run"
         required: true
         default: "development"
+      runcd:
+        description: "Run CD pipeline"
+        required: true
+        default: "false"
 
 permissions:
   id-token: write
