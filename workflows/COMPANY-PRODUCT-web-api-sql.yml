@@ -314,6 +314,7 @@ jobs:
           az webapp config appsettings set -g ${{ env.AZURE_RG_NAME }} -n ${{ env.AZURE_WEBAPP_NAME }} --settings ASPNETCORE_ENVIRONMENT=${{ env.RUNTIME_ENV }}
           az webapp config appsettings set -g ${{ env.AZURE_RG_NAME }} -n ${{ env.AZURE_WEBAPP_NAME }} --settings EntraExternalId:TenantId=${{ secrets.EEID_TENANT_ID }}
           az webapp config appsettings set -g ${{ env.AZURE_RG_NAME }} -n ${{ env.AZURE_WEBAPP_NAME }} --settings EntraExternalId:ClientId=${{ secrets.WEB_CLIENT_ID }}
+          az webapp config appsettings set -g ${{ env.AZURE_RG_NAME }} -n ${{ env.AZURE_WEBAPP_NAME }} --settings EntraExternalId:ClientSecret=${{ secrets.WEB_CLIENT_SECRET }}
           az webapp config appsettings set -g ${{ env.AZURE_RG_NAME }} -n ${{ env.AZURE_WEBAPP_NAME }} --settings BackendApi:BaseUrl="https://${{ env.AZURE_APIAPP_NAME }}.azurewebsites.net"
           az webapp config appsettings set -g ${{ env.AZURE_RG_NAME }} -n ${{ env.AZURE_WEBAPP_NAME }} --settings BackendApi:ClientId=${{ secrets.API_CLIENT_ID }}
         shell: pwsh
