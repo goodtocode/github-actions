@@ -185,7 +185,6 @@ jobs:
           app-name: ${{ env.AZURE_APIAPP_NAME }}
           package: ${{ env.API_ARTIFACT_OUTPUT }}
 
-
       - name: ${{ env.AZURE_APIAPP_NAME }} app settings
         run: |
           az config set extension.use_dynamic_install=yes_without_prompt
