@@ -1,15 +1,14 @@
 name: 'Platform Hub IaC'
 
 on:
-  push:
+  pull_request:
     branches:
       - main
     paths:
       - .github/workflows/COMPANY-platform-hub-iac.yml
       - .azure/**/*.bicep
       - .azure/**/*.bicepparams
-  pull_request:
-    types: [closed]
+  push:
     branches:
       - main
     paths:
