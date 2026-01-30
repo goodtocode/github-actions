@@ -18,6 +18,10 @@ on:
         description: "Environment to run"
         required: true
         default: "development"
+      runcd:
+        description: "Run CD pipeline"
+        required: true
+        default: "false"
 
 permissions:
   id-token: write
@@ -127,7 +131,7 @@ jobs:
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v4
-        if: ${{ github.repository_visibility == 'public' }}
+        if: ${{ !github.event.repository.private }}
 
       - name: Run Coverage Script
         run: |
@@ -147,15 +151,18 @@ jobs:
     name: "API CD"
     runs-on: ubuntu-latest
     needs: ci
-    if: (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    if: |
+        (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+        (github.event_name == 'workflow_dispatch' && (github.event.inputs.runcd == 'true' || github.event.inputs.runcd == true))
     environment: development
     strategy:
       matrix:
         DOTNET_VERSION: ["10.x"]
     env:
+      SPOKE_RG_NAME: 'COMPANY-spokemgmt-dev-wus2-001-rg'
+      APPI_NAME: 'spokemgmt-dev-wus2-001-appi'
       AZURE_APIAPP_NAME: PRODUCT-dev-wus2-001-api
       AZURE_RG_NAME: 'COMPANY-PRODUCT-dev-wus2-001-rg'
-      APPI_NAME: 'PRODUCT-dev-wus2-001-appi'
       RUNTIME_ENV: "Development"
 
     steps:
@@ -178,11 +185,10 @@ jobs:
           app-name: ${{ env.AZURE_APIAPP_NAME }}
           package: ${{ env.API_ARTIFACT_OUTPUT }}
 
-
       - name: ${{ env.AZURE_APIAPP_NAME }} app settings
         run: |
           az config set extension.use_dynamic_install=yes_without_prompt
-          $TEMP_JSON = az monitor app-insights component show -g ${{ env.AZURE_RG_NAME }} --app ${{ env.APPI_NAME }} | ConvertFrom-Json
+          $TEMP_JSON = az monitor app-insights component show -g ${{ env.SPOKE_RG_NAME }} --app ${{ env.APPI_NAME }} | ConvertFrom-Json
           $INSTR_KEY = $TEMP_JSON.instrumentationKey
           $CONN_STR = $TEMP_JSON.connectionString
           az webapp config appsettings set -g ${{ env.AZURE_RG_NAME }} -n ${{ env.AZURE_APIAPP_NAME }} --settings APPINSIGHTS_INSTRUMENTATIONKEY=$INSTR_KEY

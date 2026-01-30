@@ -19,6 +19,10 @@ on:
         description: "Environment to run"
         required: true
         default: "development"
+      runcd:
+        description: "Run CD pipeline"
+        required: true
+        default: "false"
 
 permissions:
   id-token: write
@@ -118,7 +122,7 @@ jobs:
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v4
-        if: ${{ github.repository_visibility == 'public' }}
+        if: ${{ !github.event.repository.private }}
 
       - name: Run Coverage Script
         run: |
