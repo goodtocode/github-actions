@@ -12,6 +12,8 @@
 #
 #   .\New-GithubSecret.ps1 -Owner goodtocode -Repo my-repo -Environment development -SecretName MY_SECRET -SecretValue "secret-value"
 #
+#   @{API_CLIENT_ID="your-api-client-id";AZURE_CLIENT_ID="your-azure-client-id";AZURE_SUBSCRIPTION_ID="your-azure-subscription-id";AZURE_TENANT_ID="your-azure-tenant-id";EEID_TENANT_ID="your-eeid-tenant-id";OPENAI_APIKEY="your-openai-apikey";SQL_ADMIN_PASSWORD="your-sql-admin-password";SQL_ADMIN_USER="your-sql-admin-user";WEB_CLIENT_ID="your-web-client-id";WEB_CLIENT_SECRET="your-web-client-secret"} | ForEach-Object {./github/scripts/repo/New-GithubSecret.ps1 -Owner your-github-handle -Repo your-repo -Environment development -SecretName $_.Key -SecretValue $_.Value}
+#
 param(
   [Parameter(Mandatory=$true)][string]$Owner,
   [Parameter(Mandatory=$true)][string]$Repo,
