@@ -44,8 +44,8 @@ jobs:
       SRC_SLN: "COMPANY.PRODUCT.sln"
       API_PATH: "Presentation.WebApi"
       API_PROJECT: "Presentation.WebApi.csproj"
-      TEST_PATH: "Tests.Specs.Integration"
-      TEST_PROJECT: "Tests.Specs.Integration.csproj"
+      TEST_PATH: "Tests.Integration"
+      TEST_PROJECT: "Tests.Integration.csproj"
       INFRA_PATH: 'Infrastructure.SqlServer'
       INFRA_PROJECT: 'Infrastructure.SqlServer.csproj'
       INFRA_DBCONTEXT: 'PRODUCTContext'
