@@ -127,7 +127,7 @@ jobs:
         with:
           name: ${{ env.API_ARTIFACT_NAME }}
           path: ${{ env.API_ARTIFACT_OUTPUT }}/**
-
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v4
