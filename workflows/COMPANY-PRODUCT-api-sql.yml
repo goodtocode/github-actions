@@ -44,8 +44,8 @@ jobs:
       SRC_SLN: "COMPANY.PRODUCT.sln"
       API_PATH: "Presentation.WebApi"
       API_PROJECT: "Presentation.WebApi.csproj"
-      TEST_PATH: "Tests.Specs.Integration"
-      TEST_PROJECT: "Tests.Specs.Integration.csproj"
+      TEST_PATH: "Tests.Integration"
+      TEST_PROJECT: "Tests.Integration.csproj"
       INFRA_PATH: 'Infrastructure.SqlServer'
       INFRA_PROJECT: 'Infrastructure.SqlServer.csproj'
       INFRA_DBCONTEXT: 'PRODUCTContext'
@@ -152,6 +152,7 @@ jobs:
         with:
           name: ${{ env.MIGRATION_ARTIFACT_NAME }}
           path: ${{ env.MIGRATION_ARTIFACT_PATH }}
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
         
       - name: Test
         run: |
@@ -176,6 +177,7 @@ jobs:
         with:
           name: ${{ env.API_ARTIFACT_NAME }}
           path: ${{ env.API_ARTIFACT_OUTPUT }}/**
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
 
 
       - name: Perform CodeQL Analysis
@@ -208,7 +210,7 @@ jobs:
       matrix:
         DOTNET_VERSION: ["10.x"]
     env:
-      SPOKE_RG_NAME: 'COMPANY-spokemgmt-dev-wus2-001-rg'
+      SPOKE_RG_NAME: 'COMPANY-spoke-mgmt-dev-wus2-001-rg'
       APPI_NAME: 'spokemgmt-dev-wus2-001-appi'
       AZURE_APIAPP_NAME: PRODUCT-dev-wus2-001-api
       AZURE_RG_NAME: 'COMPANY-PRODUCT-dev-wus2-001-rg'

@@ -52,8 +52,8 @@ jobs:
       SRC_SLN: "COMPANY.PRODUCT.sln"
       API_PATH: "Presentation.WebApi"
       API_PROJECT: "Presentation.WebApi.csproj"
-      TEST_PATH: "Tests.Specs.Integration"
-      TEST_PROJECT: "Tests.Specs.Integration.csproj"
+      TEST_PATH: "Tests.Integration"
+      TEST_PROJECT: "Tests.Integration.csproj"
       WEB_PATH: "Presentation.Blazor"
       WEB_PROJECT: "Presentation.Blazor.csproj"
       INFRA_PATH: 'Infrastructure.SqlServer'
@@ -154,6 +154,7 @@ jobs:
         with:
           name: ${{ env.MIGRATION_ARTIFACT_NAME }}
           path: ${{ env.MIGRATION_ARTIFACT_PATH }}
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
         
       - name: Test
         run: |
@@ -178,6 +179,7 @@ jobs:
         with:
           name: ${{ env.API_ARTIFACT_NAME }}
           path: ${{ env.API_ARTIFACT_OUTPUT }}/**
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
 
       - name: Pack Blazor artifact
         run: |
@@ -189,6 +191,7 @@ jobs:
         with:
           name: ${{ env.WEB_ARTIFACT_NAME }}
           path: ${{ env.WEB_ARTIFACT_OUTPUT }}/**
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v4

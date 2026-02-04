@@ -52,8 +52,8 @@ jobs:
       SRC_SLN: "COMPANY.PRODUCT.sln"
       API_PATH: "Presentation.WebApi"
       API_PROJECT: "Presentation.WebApi.csproj"
-      TEST_PATH: "Tests.Specs.Integration"
-      TEST_PROJECT: "Tests.Specs.Integration.csproj"
+      TEST_PATH: "Tests.Integration"
+      TEST_PROJECT: "Tests.Integration.csproj"
       WEB_PATH: "Presentation.Blazor"
       WEB_PROJECT: "Presentation.Blazor.csproj"
       INFRA_PATH: 'Infrastructure.SqlServer'
@@ -154,6 +154,7 @@ jobs:
         with:
           name: ${{ env.MIGRATION_ARTIFACT_NAME }}
           path: ${{ env.MIGRATION_ARTIFACT_PATH }}
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
         
       - name: Test
         run: |
@@ -173,11 +174,12 @@ jobs:
           dotnet publish ${{ env.SRC_PATH }}/${{ env.API_PATH }}/${{ env.API_PROJECT }} --configuration ${{ env.CONFIGURATION }} --no-build --output publish_output
         shell: pwsh
 
-      - name: Upload Web API artifact
+      - name: Upload Web API artifact      
         uses: actions/upload-artifact@v4
         with:
           name: ${{ env.API_ARTIFACT_NAME }}
           path: ${{ env.API_ARTIFACT_OUTPUT }}/**
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
 
       - name: Pack Blazor artifact
         run: |
@@ -189,6 +191,7 @@ jobs:
         with:
           name: ${{ env.WEB_ARTIFACT_NAME }}
           path: ${{ env.WEB_ARTIFACT_OUTPUT }}/**
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v4
@@ -220,7 +223,7 @@ jobs:
       matrix:
         DOTNET_VERSION: ["10.x"]
     env:
-      SPOKE_RG_NAME: 'COMPANY-spokemgmt-dev-wus2-001-rg'
+      SPOKE_RG_NAME: 'COMPANY-spoke-mgmt-dev-wus2-001-rg'
       APPI_NAME: 'spokemgmt-dev-wus2-001-appi'
       AZURE_APIAPP_NAME: PRODUCT-dev-wus2-001-api
       AZURE_WEBAPP_PACKAGE_PATH: '.'
