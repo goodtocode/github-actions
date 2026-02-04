@@ -29,10 +29,10 @@ on:
 env:
   DOTNET_SYSTEM_GLOBALIZATION_INVARIANT: "true"
   HUB_LOCATION: "westus2"
-  HUB_NETWORK_RG_NAME: "COMPANY-hubnetwork-plat-wus2-001-rg"
+  HUB_NETWORK_RG_NAME: "COMPANY-hub-network-plat-wus2-001-rg"
   HUB_NETWORK_BICEP_TEMPLATE: ".azure/templates/platform-hub-network-publicroute.bicep"
   HUB_NETWORK_BICEP_PARAMETERS: ".azure/variables/platform-hub-network-publicroute-plat.bicepparam"
-  HUB_MGMT_RG_NAME: "COMPANY-hubmgmt-plat-wus2-001-rg"
+  HUB_MGMT_RG_NAME: "COMPANY-hub-mgmt-plat-wus2-001-rg"
   HUB_MGMT_BICEP_TEMPLATE: ".azure/templates/platform-hub-mgmt.bicep"
   HUB_MGMT_BICEP_PARAMETERS: ".azure/variables/platform-hub-mgmt-plat.bicepparam"
   

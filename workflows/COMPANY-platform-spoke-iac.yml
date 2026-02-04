@@ -28,12 +28,12 @@ on:
 
 env:
   DOTNET_SYSTEM_GLOBALIZATION_INVARIANT: "true"
-  HUB_MGMT_RG_NAME: "COMPANY-hubmgmt-plat-wus2-001-rg"
+  HUB_MGMT_RG_NAME: "COMPANY-hub-mgmt-plat-wus2-001-rg"
   SPOKE_LOCATION: "westus2"
-  SPOKE_NETWORK_RG_NAME: "COMPANY-spokenetwork-dev-wus2-001-rg"
+  SPOKE_NETWORK_RG_NAME: "COMPANY-spoke-network-dev-wus2-001-rg"
   SPOKE_NETWORK_BICEP_TEMPLATE: ".azure/templates/platform-spoke-network-publicroute.bicep"
   SPOKE_NETWORK_BICEP_PARAMETERS: ".azure/variables/platform-spoke-network-publicroute-dev.bicepparam" 
-  SPOKE_MGMT_RG_NAME: "COMPANY-spokemgmt-dev-wus2-001-rg"
+  SPOKE_MGMT_RG_NAME: "COMPANY-spoke-mgmt-dev-wus2-001-rg"
   SPOKE_MGMT_BICEP_TEMPLATE: ".azure/templates/platform-spoke-mgmt.bicep"
   SPOKE_MGMT_BICEP_PARAMETERS: ".azure/variables/platform-spoke-mgmt-dev.bicepparam"
   

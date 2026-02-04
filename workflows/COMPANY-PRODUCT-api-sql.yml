@@ -210,7 +210,7 @@ jobs:
       matrix:
         DOTNET_VERSION: ["10.x"]
     env:
-      SPOKE_RG_NAME: 'COMPANY-spokemgmt-dev-wus2-001-rg'
+      SPOKE_RG_NAME: 'COMPANY-spoke-mgmt-dev-wus2-001-rg'
       APPI_NAME: 'spokemgmt-dev-wus2-001-appi'
       AZURE_APIAPP_NAME: PRODUCT-dev-wus2-001-api
       AZURE_RG_NAME: 'COMPANY-PRODUCT-dev-wus2-001-rg'
