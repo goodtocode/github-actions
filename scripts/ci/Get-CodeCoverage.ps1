@@ -5,13 +5,13 @@
 #   2. Change directory to the script folder:
 #      CD src (wherever your script is)
 #   3. In powershell, run script: 
-#      .\Get-CodeCoverage.ps1 -TestProjectFilter '*.Tests.csproj' -ProdPackagesOnly -ProductionAssemblies 'MyApp.Core','MyApp.Web'
+#      .\Get-CodeCoverage.ps1 -TestProjectFilter '*Tests*.csproj' -ProdPackagesOnly -ProductionAssemblies 'MyApp.Core','MyApp.Web'
 # This script uses native .NET 10 code coverage (Microsoft.Testing.Platform)
 # Note: Due to MSTest 4.1.0 incompatibility with 'dotnet test' on .NET 10, this runs tests as executables
 ####################################################################################
 
 Param(
-    [string]$TestProjectFilter = '*.Tests.csproj',    
+    [string]$TestProjectFilter = '*Tests*.csproj',    
     [switch]$ProdPackagesOnly = $false,    
     [string[]]$ProductionAssemblies = @(),
     [string]$Configuration = 'Release',
@@ -65,6 +65,9 @@ Write-Host "Found $($testProjects.Count) test projects."
 foreach ($project in $testProjects) {
     $testProjectPath = $project.FullName
     Write-Host "Running tests with coverage for project: $($project.BaseName)"
+
+    Write-Host "Building test project: $($project.BaseName)"
+    & dotnet build $testProjectPath --configuration $Configuration
     
     # Use 'dotnet run' instead of 'dotnet test' for MSTest runner projects
     # This bypasses the VSTest target that's incompatible with .NET 10 SDK

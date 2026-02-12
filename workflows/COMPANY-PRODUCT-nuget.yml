@@ -98,7 +98,7 @@ jobs:
       - name: Test
         run: |
           cd ${{ env.SRC_PATH }}/${{ env.TEST_PATH }}
-          dotnet run --configuration Release --no-build
+          dotnet run --configuration ${{ env.CONFIGURATION }} --no-build
         shell: pwsh
 
       - name: Copy test results

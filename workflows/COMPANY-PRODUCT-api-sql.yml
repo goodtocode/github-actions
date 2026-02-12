@@ -156,8 +156,17 @@ jobs:
         
       - name: Test
         run: |
+          cd ${{ env.SRC_PATH }}/${{ env.TEST_PATH }}
+          dotnet run --configuration ${{ env.CONFIGURATION }} --no-build
+        shell: pwsh
+
+      - name: Copy test results
+        if: ${{ always() }}
+        run: |
           mkdir -p TestResults-${{ matrix.DOTNET_VERSION }}
-          dotnet test ${{ env.SRC_PATH }}/${{ env.TEST_PATH }}/${{ env.TEST_PROJECT }} --configuration ${{ env.CONFIGURATION }} --results-directory TestResults-${{ matrix.DOTNET_VERSION }} --collect:"Code Coverage" --verbosity normal
+          if (Test-Path "${{ env.SRC_PATH }}/${{ env.TEST_PATH }}/bin/Release/net10.0/TestResults") {
+            Copy-Item -Path "${{ env.SRC_PATH }}/${{ env.TEST_PATH }}/bin/Release/net10.0/TestResults/*" -Destination "TestResults-${{ matrix.DOTNET_VERSION }}" -Recurse -Force
+          }
         shell: pwsh
 
       - name: Upload test results
@@ -186,9 +195,11 @@ jobs:
 
       - name: Run Coverage Script
         run: |
-          pwsh ${{ env.SRC_PATH }}/Get-CodeCoverage.ps1 `
+          pwsh ${{ env.SCRIPTS_PATH }}/ci/Get-CodeCoverage.ps1 `
             -TestProjectFilter '${{ env.TEST_PROJECT }}' `
-            -ProdPackagesOnly            
+            -ProdPackagesOnly `
+            -ProductionAssemblies Core.Application Presentation.WebApi Presentation.Blazor `
+            -Configuration ${{ env.CONFIGURATION }}
         shell: pwsh
 
       - name: Upload Coverage Report
