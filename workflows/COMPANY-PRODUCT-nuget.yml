@@ -33,12 +33,11 @@ env:
   CONFIGURATION: "Release"
   SCRIPTS_PATH: "./.github/scripts"
   SRC_PATH: "./src"
-  PROJECT_PATH: "COMPANY.PRODUCT"
+  PROJECT_PATH: "COMPANY.PPRODUCT"
   PROJECT_FILE: "COMPANY.PRODUCT.csproj"
   SRC_SLN: "COMPANY.PRODUCT.sln"
   TEST_PATH: "COMPANY.PRODUCT.Tests"
   TEST_PROJECT: "COMPANY.PRODUCT.Tests.csproj"
-
 jobs:
   ci:
     name: "NuGet CI"
@@ -135,7 +134,7 @@ jobs:
 
       - name: Run Coverage Script
         run: |
-          pwsh ${{ env.SRC_PATH }}/Get-CodeCoverage.ps1 `
+          pwsh ${{ env.SCRIPTS_PATH }}/ci/Get-CodeCoverage.ps1 `
             -TestProjectFilter '${{ env.TEST_PROJECT }}' `
             -ProdPackagesOnly `
             -ProductionAssemblies Core.Application Presentation.WebApi Presentation.Blazor `
