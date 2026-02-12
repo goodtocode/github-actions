@@ -5,15 +5,13 @@
 #   2. Change directory to the script folder:
 #      CD src (wherever your script is)
 #   3. In powershell, run script: 
-#      .\Get-CodeCoverage.ps1 -TestProjectFilter '*Tests*.csproj' -ProdPackagesOnly -ProductionAssemblies 'MyApp.Core','MyApp.Web'
+#      .\Get-CodeCoverage.ps1 -TestProjectFilter '*Tests*.csproj'
 # This script uses native .NET 10 code coverage (Microsoft.Testing.Platform)
 # Note: Due to MSTest 4.1.0 incompatibility with 'dotnet test' on .NET 10, this runs tests as executables
 ####################################################################################
 
 Param(
     [string]$TestProjectFilter = '*Tests*.csproj',    
-    [switch]$ProdPackagesOnly = $false,    
-    [string[]]$ProductionAssemblies = @(),
     [string]$Configuration = 'Release',
     [string]$TestRootPath = ''
 )
@@ -106,14 +104,7 @@ Write-Host "Generated $($coverageXmlFiles.Count) XML coverage file(s)"
 
 # Generate HTML report
 $coverageFilesArg = ($coverageXmlFiles -join ";")
-
-if ($ProdPackagesOnly) {
-    $assemblyFilters = ($ProductionAssemblies | ForEach-Object { "+$_" }) -join ";"
-    & reportgenerator -reports:$coverageFilesArg -targetdir:$reportOutputPath -reporttypes:Html -assemblyfilters:$assemblyFilters
-}
-else {
-    & reportgenerator -reports:$coverageFilesArg -targetdir:$reportOutputPath -reporttypes:Html
-}
+& reportgenerator -reports:$coverageFilesArg -targetdir:$reportOutputPath -reporttypes:Html
 
 Write-Host "Code coverage report generated at: $reportOutputPath"
 

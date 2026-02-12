@@ -210,9 +210,8 @@ jobs:
         run: |
           pwsh ${{ env.SCRIPTS_PATH }}/ci/Get-CodeCoverage.ps1 `
             -TestProjectFilter '${{ env.TEST_PROJECT }}' `
-            -ProdPackagesOnly `
-            -ProductionAssemblies Core.Application Presentation.WebApi Presentation.Blazor `
-            -Configuration ${{ env.CONFIGURATION }}
+            -Configuration '${{ env.CONFIGURATION }}' `
+            -TestRootPath '${{ env.SRC_PATH }}'
         shell: pwsh
 
       - name: Upload Coverage Report

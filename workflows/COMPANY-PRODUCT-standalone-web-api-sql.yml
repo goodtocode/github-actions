@@ -210,9 +210,8 @@ jobs:
         run: |
           pwsh ${{ env.SCRIPTS_PATH }}/ci/Get-CodeCoverage.ps1 `
             -TestProjectFilter '${{ env.TEST_PROJECT }}' `
-            -ProdPackagesOnly `
-            -ProductionAssemblies Core.Application Presentation.WebApi Presentation.Blazor `
-            -Configuration ${{ env.CONFIGURATION }}
+            -Configuration '${{ env.CONFIGURATION }}' `
+            -TestRootPath '${{ env.SRC_PATH }}'
         shell: pwsh
 
       - name: Upload Coverage Report
@@ -235,9 +234,9 @@ jobs:
         DOTNET_VERSION: ["10.x"]
     env:
       APPI_NAME: 'PRODUCT-dev-wus2-001-appi'
-      AZURE_APIAPP_NAME: PRODUCT-dev-wus2-001-api
+      AZURE_APIAPP_NAME: 'PRODUCT-dev-wus2-001-api'
       AZURE_WEBAPP_PACKAGE_PATH: '.'
-      AZURE_WEBAPP_NAME: PRODUCT-dev-wus2-001-web
+      AZURE_WEBAPP_NAME: 'PRODUCT-dev-wus2-001-web'
       AZURE_RG_NAME: 'COMPANY-PRODUCT-dev-wus2-001-rg'
       SQL_NAME: 'PRODUCT-dev-wus2-001-sql'
       SQLDB_NAME: 'PRODUCT-dev-wus2-001-sqldb'
