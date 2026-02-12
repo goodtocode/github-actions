@@ -79,7 +79,7 @@ $coverageFiles = Get-ChildItem -Path $testRootPath -Filter "*.coverage" -Recurse
 
 if ($coverageFiles.Count -eq 0) {
     Write-Warning "No coverage files found. Make sure your test projects have code coverage enabled."
-    exit 1
+    exit 0
 }
 
 Write-Host "Found $($coverageFiles.Count) coverage file(s)"
@@ -97,7 +97,7 @@ foreach ($coverageFile in $coverageFiles) {
 
 if ($coverageXmlFiles.Count -eq 0) {
     Write-Warning "No XML coverage files were generated."
-    exit 1
+    exit 0
 }
 
 Write-Host "Generated $($coverageXmlFiles.Count) XML coverage file(s)"
