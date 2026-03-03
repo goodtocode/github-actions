@@ -176,41 +176,35 @@ if ($repoExists) {
 }
 Remove-Item $tmp -Force
 
-# ---- 5) Create a new ruleset called 'main-ruleset' (modern GitHub Ruleset API)
-# This is the new recommended way to enforce branch policies.
-if ($repoExists) {
-  Write-Host "Creating 'main-ruleset' for branch 'main'..."
-  $rulesetBodyObj = @{
-    name        = "main-ruleset"
-    target      = "branch"
-    enforcement = "active"
-    conditions  = @{
-      ref_name = @{
-        include = @("refs/heads/main")
-        exclude = @()
-      }
+    # ---- 5) Ensure 'main-ruleset' branch protection is present (idempotent)
+    if ($repoExists) {
+        Write-Host "Checking for 'main-ruleset' branch protection..."
+        $rulesetBodyObj = @{
+            name        = "main-ruleset"
+            target      = "branch"
+            enforcement = "active"
+            conditions  = @{
+                ref_name = @{
+                    include = @("refs/heads/main")
+                    exclude = @()
+                }
+            }
+            rules       = @(
+                @{ type = "pull_request" },
+                @{ type = "required_linear_history" }
+            )
+        }
+        $rulesetBody = $rulesetBodyObj | ConvertTo-Json -Compress -Depth 5
+        $existingRulesets = gh api "/repos/$Owner/$Repo/rulesets" | ConvertFrom-Json
+        $mainRuleset = $existingRulesets | Where-Object { $_.name -eq "main-ruleset" }
+        if (-not $mainRuleset) {
+            Write-Host "Creating 'main-ruleset' for branch 'main'..."
+            $response = $rulesetBody | gh api -X POST "/repos/$Owner/$Repo/rulesets" --input - -H "Accept: application/vnd.github+json"
+            Write-Host "'main-ruleset' created."
+        } else {
+            Write-Host "'main-ruleset' already exists."
+        }
     }
-    rules       = @(
-        # Require PR before merging
-        @{ type = "pull_request" },
-        # Require linear history
-        @{ type = "required_linear_history" }
-    )
-    # Note: To allow force-push for emergencies, add a bypass_actors array with your user/team and bypass_mode="always".
-    # Example: bypass_actors = @(@{ actor_id = 123456; actor_type = "User"; bypass_mode = "always" })
-  }
-  $rulesetBody = $rulesetBodyObj | ConvertTo-Json -Compress -Depth 5
-
-  $existingRulesets = gh api "/repos/$Owner/$Repo/rulesets" | ConvertFrom-Json
-  $mainRuleset = $existingRulesets | Where-Object { $_.name -eq "main-ruleset" }
-  if (-not $mainRuleset) {
-    $response = $rulesetBody | gh api -X POST "/repos/$Owner/$Repo/rulesets" --input - -H "Accept: application/vnd.github+json"
-    Write-Host "'main-ruleset' created."
-  }
-  else {
-    Write-Host "'main-ruleset' already exists. Skipping creation."
-  }
-}
 # Ref: https://docs.github.com/en/rest/branches/rulesets?apiVersion=2022-11-28
 
 # ---- 6) Create Environments: development & production

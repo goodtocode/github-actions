@@ -1,4 +1,8 @@
 name: 'Web & API & SQL CI/CD'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 on:
   pull_request:
     branches:
@@ -36,6 +40,7 @@ env:
   MIGRATION_ARTIFACT_NAME: 'ef-migrations'
   MIGRATION_ARTIFACT_PATH: 'ef-migrations.sql'
   MIGRATION_ARTIFACT_OUTPUT_PATH: './'
+  CODEQL_ON_PRIVATE: "false"
 
 jobs:
   ci:
@@ -73,6 +78,14 @@ jobs:
         with:
           dotnet-version: ${{ matrix.DOTNET_VERSION }}
 
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.sln', '**/*.csproj') }}
+          restore-keys: |
+            nuget-${{ runner.os }}-
+
       - name: Get Semantic Version
         id: get_version
         run: |
@@ -109,9 +122,12 @@ jobs:
         with:
           languages: csharp
 
-      - name: Build
-        run: |
-          dotnet build ${{ env.SRC_PATH }}/${{ env.SRC_SLN }} --configuration ${{ env.CONFIGURATION }}
+      - name: Verify code formatting
+        run: dotnet format ${{ env.SRC_PATH }}/${{ env.SRC_SLN }} --verify-no-changes
+        shell: pwsh
+
+      - name: Build (warnings as errors)
+        run: dotnet build ${{ env.SRC_PATH }}/${{ env.SRC_SLN }} --configuration ${{ env.CONFIGURATION }} -warnaserror
         shell: pwsh
 
       - name: Install dotnet-ef
@@ -122,6 +138,7 @@ jobs:
         shell: pwsh
 
       - name: Check for uncommitted EF Core model changes (diagnostic)
+        if: github.event_name == 'pull_request'
         run: |
           Write-Host "Working Directory: $(Get-Location)"
           $tempDir = "${{ env.SRC_PATH }}/${{ env.INFRA_PATH }}/.temp-migrations"
@@ -204,7 +221,7 @@ jobs:
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v4
-        if: ${{ !github.event.repository.private }}
+        if: ${{ env.CODEQL_ON_PRIVATE == 'true' || !github.event.repository.private }}
 
       - name: Run Coverage Script
         run: |
