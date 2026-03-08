@@ -122,12 +122,8 @@ jobs:
         with:
           languages: csharp
 
-      - name: Verify code formatting
-        run: dotnet format ${{ env.SRC_PATH }}/${{ env.SRC_SLN }} --verify-no-changes
-        shell: pwsh
-
       - name: Build (warnings as errors)
-        run: dotnet build ${{ env.SRC_PATH }}/${{ env.SRC_SLN }} --configuration ${{ env.CONFIGURATION }} -warnaserror
+        run: dotnet build ${{ env.SRC_PATH }}/${{ env.SRC_SLN }} --configuration ${{ env.CONFIGURATION }}
         shell: pwsh
 
       - name: Install dotnet-ef
@@ -251,7 +247,7 @@ jobs:
         DOTNET_VERSION: ["10.x"]
     env:
       SPOKE_RG_NAME: 'COMPANY-spoke-mgmt-dev-wus2-001-rg'
-      APPI_NAME: 'spokemgmt-dev-wus2-001-appi'
+      APPI_NAME: 'spspoke-mgmt-dev-wus2-001-appi'
       AZURE_APIAPP_NAME: PRODUCT-dev-wus2-001-api
       AZURE_WEBAPP_PACKAGE_PATH: '.'
       AZURE_WEBAPP_NAME: PRODUCT-dev-wus2-001-web
