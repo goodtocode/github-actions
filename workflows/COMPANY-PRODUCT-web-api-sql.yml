@@ -247,7 +247,7 @@ jobs:
         DOTNET_VERSION: ["10.x"]
     env:
       SPOKE_RG_NAME: 'COMPANY-spoke-mgmt-dev-wus2-001-rg'
-      APPI_NAME: 'spspoke-mgmt-dev-wus2-001-appi'
+      APPI_NAME: 'spoke-mgmt-dev-wus2-001-appi'
       AZURE_APIAPP_NAME: PRODUCT-dev-wus2-001-api
       AZURE_WEBAPP_PACKAGE_PATH: '.'
       AZURE_WEBAPP_NAME: PRODUCT-dev-wus2-001-web
