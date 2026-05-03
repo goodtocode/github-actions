@@ -120,7 +120,7 @@ jobs:
     needs: ci
     if: |
         (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
-        (github.event_name == 'workflow_dispatch' && (github.event.inputs.runcd == 'true' || github.event.inputs.runcd == true))
+        (github.event_name == 'workflow_dispatch' && (github.event.inputs.runcd == 'true' || github.event.inputs.runcd == true) && github.event.inputs.environment == 'production')
     environment: production
     strategy:
       matrix:
