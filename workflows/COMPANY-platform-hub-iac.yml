@@ -20,7 +20,7 @@ on:
       environment:
         description: "Environment to run"
         required: true
-        default: "development"
+        default: "platform"
       runcd:
         description: "Run CD pipeline"
         required: true
@@ -46,7 +46,7 @@ jobs:
     name: "Validate hub IaC"
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || github.event_name == 'push'
-    environment: development
+    environment: platform
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -88,8 +88,8 @@ jobs:
     needs: ci
     if: |
         (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
-        (github.event_name == 'workflow_dispatch' && (github.event.inputs.runcd == 'true' || github.event.inputs.runcd == true))
-    environment: development
+        (github.event_name == 'workflow_dispatch' && (github.event.inputs.runcd == 'true' || github.event.inputs.runcd == true) && github.event.inputs.environment == 'platform')
+    environment: platform
     steps:
       - name: Checkout
         uses: actions/checkout@v3
