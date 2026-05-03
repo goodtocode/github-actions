@@ -157,26 +157,8 @@ jobs:
         if: github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
         
       - name: Test
-        run: |
-          cd ${{ env.SRC_PATH }}/${{ env.TEST_PATH }}
-          dotnet run --configuration ${{ env.CONFIGURATION }} --no-build
+        run: dotnet test ${{ env.SRC_PATH }}/${{ env.SRC_SLN }} --configuration ${{ env.CONFIGURATION }} --no-build
         shell: pwsh
-
-      - name: Copy test results
-        if: ${{ always() }}
-        run: |
-          mkdir -p TestResults-${{ matrix.DOTNET_VERSION }}
-          if (Test-Path "${{ env.SRC_PATH }}/${{ env.TEST_PATH }}/bin/Release/net10.0/TestResults") {
-            Copy-Item -Path "${{ env.SRC_PATH }}/${{ env.TEST_PATH }}/bin/Release/net10.0/TestResults/*" -Destination "TestResults-${{ matrix.DOTNET_VERSION }}" -Recurse -Force
-          }
-        shell: pwsh
-
-      - name: Upload test results
-        uses: actions/upload-artifact@v4
-        with:
-          name: dotnet-results-${{ matrix.DOTNET_VERSION }}
-          path: TestResults-${{ matrix.DOTNET_VERSION }}
-        if: ${{ always() }}
 
       - name: Pack Web API artifact
         run: |
@@ -205,21 +187,6 @@ jobs:
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v4
         if: ${{ !github.event.repository.private }}
-
-      - name: Run Coverage Script
-        run: |
-          pwsh ${{ env.SCRIPTS_PATH }}/ci/Get-CodeCoverage.ps1 `
-            -TestProjectFilter '${{ env.TEST_PROJECT }}' `
-            -Configuration '${{ env.CONFIGURATION }}' `
-            -TestRootPath '${{ env.SRC_PATH }}'
-        shell: pwsh
-
-      - name: Upload Coverage Report
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage-report-${{ matrix.DOTNET_VERSION }}
-          path: ${{ env.SRC_PATH }}/TestResults/Reports/**/index.html
-        if: ${{ always() }}
 
   cd:
     name: "Web, API and SQL CD"
