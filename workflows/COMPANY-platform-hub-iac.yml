@@ -49,35 +49,35 @@ jobs:
     environment: platform
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: "Az CLI login"
-        uses: azure/login@v1
+        uses: azure/login@v2
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.PLATFORM_SUBSCRIPTION_ID }}
 
       - name: Create ${{ env.HUB_NETWORK_RG_NAME }}
-        uses: Azure/cli@v2.1.0
+        uses: Azure/cli@v2
         with:
           inlineScript: |
             az group create -n ${{ env.HUB_NETWORK_RG_NAME }} -l ${{ env.HUB_LOCATION }}
 
       - name: Validate ${{ env.HUB_NETWORK_RG_NAME }}
-        uses: Azure/cli@v2.1.0
+        uses: Azure/cli@v2
         with:
           inlineScript: |
             az deployment group what-if --resource-group ${{ env.HUB_NETWORK_RG_NAME }} --template-file ${{ env.HUB_NETWORK_BICEP_TEMPLATE }} --parameters ${{ env.HUB_NETWORK_BICEP_PARAMETERS }}
 
       - name: Create ${{ env.HUB_MGMT_RG_NAME }}
-        uses: Azure/cli@v2.1.0
+        uses: Azure/cli@v2
         with:
           inlineScript: |
             az group create -n ${{ env.HUB_MGMT_RG_NAME }} -l ${{ env.HUB_LOCATION }}
 
       - name: Validate ${{ env.HUB_MGMT_RG_NAME }}
-        uses: Azure/cli@v2.1.0
+        uses: Azure/cli@v2
         with:
           inlineScript: |
             az deployment group what-if --resource-group ${{ env.HUB_MGMT_RG_NAME }} --template-file ${{ env.HUB_MGMT_BICEP_TEMPLATE }} --parameters ${{ env.HUB_MGMT_BICEP_PARAMETERS }}
@@ -92,35 +92,35 @@ jobs:
     environment: platform
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: "Az CLI login"
-        uses: azure/login@v1
+        uses: azure/login@v2
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.PLATFORM_SUBSCRIPTION_ID }}
 
       - name: Create ${{ env.HUB_NETWORK_RG_NAME }}
-        uses: Azure/cli@v2.1.0
+        uses: Azure/cli@v2
         with:
           inlineScript: |
             az group create -n ${{ env.HUB_NETWORK_RG_NAME }} -l ${{ env.HUB_LOCATION }}
 
       - name: Deploy ${{ env.HUB_NETWORK_RG_NAME }}
-        uses: Azure/cli@v2.1.0
+        uses: Azure/cli@v2
         with:
           inlineScript: |
             az deployment group create --resource-group ${{ env.HUB_NETWORK_RG_NAME }} --template-file ${{ env.HUB_NETWORK_BICEP_TEMPLATE }} --parameters ${{ env.HUB_NETWORK_BICEP_PARAMETERS }}
 
       - name: Create ${{ env.HUB_MGMT_RG_NAME }}
-        uses: Azure/cli@v2.1.0
+        uses: Azure/cli@v2
         with:
           inlineScript: |
             az group create -n ${{ env.HUB_MGMT_RG_NAME }} -l ${{ env.HUB_LOCATION }}
 
       - name: Deploy ${{ env.HUB_MGMT_RG_NAME }}
-        uses: Azure/cli@v2.1.0
+        uses: Azure/cli@v2
         with:
           inlineScript: |
             az deployment group create --resource-group ${{ env.HUB_MGMT_RG_NAME }} --template-file ${{ env.HUB_MGMT_BICEP_TEMPLATE }} --parameters ${{ env.HUB_MGMT_BICEP_PARAMETERS }}
