@@ -6,7 +6,7 @@
 #   3. Change directory to the script folder:
 #      CD C:\Scripts (wherever your script is)
 #   4. In powershell, run script: 
-#      .\New-Github-Azure-Federation.ps1  -TenantId 12343dac-0e69-436a-866b-456727dd3579 -SubscriptionId 12343dac-0e69-436a-866b-456727dd3579 -PrincipalName myco-github-devtest-001 -Organization mygithuborg -Repository mygithubrepo -Environment development
+#      .\New-Github-Azure-Federation.ps1  -TenantId 12343dac-0e69-436a-866b-456727dd3579 -SubscriptionId 12343dac-0e69-436a-866b-456727dd3579 -PrincipalName myco-github-devtest-100 -Organization mygithuborg -Repository mygithubrepo -Environment development
 ####################################################################################
 
 param (
@@ -15,7 +15,7 @@ param (
    [Parameter(Mandatory = $true, ValueFromPipelineByPropertyName = $true)]
    [guid]$SubscriptionId = $(throw '-SubscriptionId is a required parameter.'), #12343dac-0e69-436a-866b-456727dd3579
    [Parameter(Mandatory = $true, ValueFromPipelineByPropertyName = $true)]
-   [string]$PrincipalName = $(throw '-PrincipalName is a required parameter.'), #Example: COMPANY-SUB_OR_PRODUCTLINE-github-001
+   [string]$PrincipalName = $(throw '-PrincipalName is a required parameter.'), #Example: can-SUB_OR_PRODUCTLINE-github-100
    [Parameter(Mandatory = $true, ValueFromPipelineByPropertyName = $true)]
    [string]$Organization = $(throw '-Organization is a required parameter.'), #GitHub Organization Name
    [Parameter(Mandatory = $true, ValueFromPipelineByPropertyName = $true)]
@@ -74,14 +74,39 @@ if (-not $sp) {
 Write-Host "Service Principal Id: $($sp.Id)"
 $spObjectId = $sp.Id
 
-# Idempotent Role Assignment
-$roleAssignment = Get-AzRoleAssignment -ObjectId $spObjectId -RoleDefinitionName Contributor -Scope "/subscriptions/$SubscriptionId" -ErrorAction SilentlyContinue
+# Idempotent Role Assignment with retry to handle Entra ID propagation delay.
+$roleName = 'Contributor'
+$roleScope = "/subscriptions/$SubscriptionId"
+$maxAttempts = 6
+$retryDelaySeconds = 10
+
+$roleAssignment = Get-AzRoleAssignment -ObjectId $spObjectId -RoleDefinitionName $roleName -Scope $roleScope -ErrorAction SilentlyContinue
 if (-not $roleAssignment) {
-   New-AzRoleAssignment -ObjectId $spObjectId -RoleDefinitionName Contributor -Scope "/subscriptions/$SubscriptionId"
+   for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
+      try {
+         Write-Host "Assigning role '$roleName' on '$roleScope' (attempt $attempt of $maxAttempts)..."
+         New-AzRoleAssignment -ObjectId $spObjectId -RoleDefinitionName $roleName -Scope $roleScope -ErrorAction Stop | Out-Null
+         break
+      }
+      catch {
+         if ($attempt -eq $maxAttempts) {
+            throw
+         }
+         Write-Host "Role assignment attempt $attempt failed. Retrying in $retryDelaySeconds seconds..."
+         Start-Sleep -Seconds $retryDelaySeconds
+      }
+   }
 }
 else {
    Write-Host "Role assignment already exists."
 }
+
+# Verify role assignment exists after create/retry path.
+$roleAssignment = Get-AzRoleAssignment -ObjectId $spObjectId -RoleDefinitionName $roleName -Scope $roleScope -ErrorAction SilentlyContinue
+if (-not $roleAssignment) {
+   throw "Failed to verify role assignment '$roleName' for service principal '$PrincipalName' at scope '$roleScope'."
+}
+Write-Host "Verified role assignment '$roleName' at '$roleScope'."
 
 $tenantId = (Get-AzContext).Subscription.TenantId
 

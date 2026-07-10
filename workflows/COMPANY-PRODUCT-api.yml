@@ -62,7 +62,7 @@ jobs:
 
     steps:
       - name: checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: dotnet version ${{ matrix.DOTNET_VERSION }}
         uses: actions/setup-dotnet@v4
@@ -163,7 +163,7 @@ jobs:
           path: ${{ env.API_ARTIFACT_OUTPUT }}
 
       - name: az login
-        uses: azure/login@v1
+        uses: azure/login@v2
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
