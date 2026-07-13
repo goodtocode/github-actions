@@ -1,4 +1,4 @@
-name: 'Platform Spoke AI IaC'
+name: 'Platform Spoke AOAI IaC'
 
 on:
   pull_request:
@@ -37,10 +37,10 @@ env:
   SPOKE_LOCATION: "westus2"
   SPOKE_ENVIRONMENT: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.environment || 'development' }}
   SPOKE_AI_RG_NAME: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'production' && 'COMPANY-spoke-ai-prod-wus2-001-rg' || 'COMPANY-spoke-ai-dev-wus2-001-rg' }}
-  SPOKE_AI_BICEP_TEMPLATE: ".azure/templates/platform-standalone-ai-openai.bicep"
-  SPOKE_AI_BICEP_PARAMETERS_DEV: ".azure/variables/platform-standalone-ai-openai-dev.bicepparam"
-  SPOKE_AI_BICEP_PARAMETERS_PROD: ".azure/variables/platform-standalone-ai-openai-prod.bicepparam"
-  SPOKE_AI_BICEP_PARAMETERS_SELECTED: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'production' && '.azure/variables/platform-standalone-ai-openai-prod.bicepparam' || '.azure/variables/platform-standalone-ai-openai-dev.bicepparam' }}
+  SPOKE_AI_BICEP_TEMPLATE: ".azure/templates/platform-standalone-ai-aoai.bicep"
+  SPOKE_AI_BICEP_PARAMETERS_DEV: ".azure/variables/platform-standalone-ai-aoai-dev.bicepparam"
+  SPOKE_AI_BICEP_PARAMETERS_PROD: ".azure/variables/platform-standalone-ai-aoai-prod.bicepparam"
+  SPOKE_AI_BICEP_PARAMETERS_SELECTED: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'production' && '.azure/variables/platform-standalone-ai-aoai-prod.bicepparam' || '.azure/variables/platform-standalone-ai-aoai-dev.bicepparam' }}
   SPOKE_AI_MODEL_NAME: "gpt-5.6-luna"
   
 permissions:
@@ -50,7 +50,7 @@ permissions:
 
 jobs:
   ci:
-    name: "Validate spoke AI IaC"
+    name: "Validate spoke AOAI IaC"
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || github.event_name == 'push'
     environment: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.environment || 'development' }}
@@ -78,7 +78,7 @@ jobs:
             az deployment group what-if --resource-group ${{ env.SPOKE_AI_RG_NAME }} --template-file ${{ env.SPOKE_AI_BICEP_TEMPLATE }} --parameters ${{ env.SPOKE_AI_BICEP_PARAMETERS_SELECTED }} --parameters modelName=${{ env.SPOKE_AI_MODEL_NAME }}
 
   cd:
-    name: "Deploy standalone AI IaC"
+    name: "Deploy standalone AOAI IaC"
     runs-on: ubuntu-latest
     needs: ci
     if: |
