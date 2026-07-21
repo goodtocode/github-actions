@@ -82,7 +82,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.nuget/packages
-          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.sln', '**/*.csproj') }}
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.slnx', '**/*.csproj') }}
           restore-keys: |
             nuget-${{ runner.os }}-
 
@@ -123,7 +123,7 @@ jobs:
           languages: csharp
 
       - name: Build (warnings as errors)
-        run: dotnet build ${{ env.SRC_PATH }}/${{ env.SRC_SLN }} --configuration ${{ env.CONFIGURATION }}
+        run: dotnet build ${{ env.SRC_SLN }} --configuration ${{ env.CONFIGURATION }}
         shell: pwsh
 
       - name: Install dotnet-ef
@@ -170,7 +170,7 @@ jobs:
         if: github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
         
       - name: Test
-        run: dotnet test ${{ env.SRC_PATH }}/${{ env.SRC_SLN }} --configuration ${{ env.CONFIGURATION }} --no-build
+        run: dotnet build ${{ env.SRC_SLN }} --configuration ${{ env.CONFIGURATION }} --no-build
         shell: pwsh
 
       - name: Pack Web API artifact
