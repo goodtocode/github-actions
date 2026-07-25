@@ -49,7 +49,7 @@ jobs:
     env:
       SCRIPTS_PATH: "./.github/scripts"
       SRC_PATH: "./src"
-      SRC_SLN: "COMPANY.PRODUCT.sln"
+      SRC_SLN: "COMPANY.PRODUCT.slnx"
       API_PATH: "Presentation.Api"
       API_PROJECT: "Presentation.Api.csproj"
       TEST_PATH: "Tests.Integration"
