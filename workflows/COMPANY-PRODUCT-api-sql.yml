@@ -34,6 +34,14 @@ permissions:
   security-events: write
 
 env:
+  # Manual environment-specific values (update these first)
+  SPOKE_RG_NAME: 'COMPANY-spoke-mgmt-dev-wus2-001-rg'
+  APPI_NAME: 'spoke-mgmt-dev-wus2-001-appi'
+  AZURE_APIAPP_NAME: PRODUCT-dev-wus2-001-api
+  AZURE_RG_NAME: 'COMPANY-PRODUCT-dev-wus2-001-rg'
+  SQL_NAME: 'PRODUCT-dev-wus2-001-sql'
+  SQLDB_NAME: 'PRODUCT-dev-wus2-001-sqldb'
+
   API_ARTIFACT_OUTPUT: 'publish_output'
   API_ARTIFACT_NAME: 'api-artifact'
   MIGRATION_ARTIFACT_NAME: 'ef-migrations'
@@ -199,12 +207,6 @@ jobs:
       matrix:
         DOTNET_VERSION: ["10.x"]
     env:
-      SPOKE_RG_NAME: 'COMPANY-spoke-mgmt-dev-wus2-001-rg'
-      APPI_NAME: 'spspoke-mgmt-dev-wus2-001-appi'
-      AZURE_APIAPP_NAME: PRODUCT-dev-wus2-001-api
-      AZURE_RG_NAME: 'COMPANY-PRODUCT-dev-wus2-001-rg'
-      SQL_NAME: 'PRODUCT-dev-wus2-001-sql'
-      SQLDB_NAME: 'PRODUCT-dev-wus2-001-sqldb'
       RUNTIME_ENV: "Development"
 
     steps:

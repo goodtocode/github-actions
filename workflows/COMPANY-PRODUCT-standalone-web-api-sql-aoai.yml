@@ -29,6 +29,14 @@ permissions:
   security-events: write
 
 env:
+  # Manual environment-specific values (update these first)
+  APPI_NAME: 'PRODUCT-dev-wus2-001-appi'
+  AZURE_APIAPP_NAME: 'PRODUCT-dev-wus2-001-api'
+  AZURE_WEBAPP_NAME: 'PRODUCT-dev-wus2-001-web'
+  AZURE_RG_NAME: 'COMPANY-PRODUCT-dev-wus2-001-rg'
+  SQL_NAME: 'PRODUCT-dev-wus2-001-sql'
+  SQLDB_NAME: 'PRODUCT-dev-wus2-001-sqldb'
+
   API_ARTIFACT_OUTPUT: 'publish_output'
   WEB_ARTIFACT_OUTPUT: 'publish_web_output'
   API_ARTIFACT_NAME: 'api-artifact'
@@ -202,13 +210,7 @@ jobs:
       matrix:
         DOTNET_VERSION: ["10.x"]
     env:
-      APPI_NAME: 'PRODUCT-dev-wus2-001-appi'
-      AZURE_APIAPP_NAME: 'PRODUCT-dev-wus2-001-api'
       AZURE_WEBAPP_PACKAGE_PATH: '.'
-      AZURE_WEBAPP_NAME: 'PRODUCT-dev-wus2-001-web'
-      AZURE_RG_NAME: 'COMPANY-PRODUCT-dev-wus2-001-rg'
-      SQL_NAME: 'PRODUCT-dev-wus2-001-sql'
-      SQLDB_NAME: 'PRODUCT-dev-wus2-001-sqldb'
       RUNTIME_ENV: "Development"
 
     steps:
