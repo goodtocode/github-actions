@@ -4,13 +4,13 @@ on:
     branches:
       - main
     paths:
-      - .github/workflows/COMPANY-PRODUCT-standalone-web-api-sql.yml
+      - .github/workflows/COMPANY-PRODUCT-standalone-web-api-sql-aoai.yml
       - src/**
   push:
     branches:
       - main
     paths:
-      - .github/workflows/COMPANY-PRODUCT-standalone-web-api-sql.yml
+      - .github/workflows/COMPANY-PRODUCT-standalone-web-api-sql-aoai.yml
       - src/**
   workflow_dispatch:
     inputs:
@@ -29,6 +29,14 @@ permissions:
   security-events: write
 
 env:
+  # Manual environment-specific values (update these first)
+  APPI_NAME: 'PRODUCT-dev-wus2-001-appi'
+  AZURE_APIAPP_NAME: 'PRODUCT-dev-wus2-001-api'
+  AZURE_WEBAPP_NAME: 'PRODUCT-dev-wus2-001-web'
+  AZURE_RG_NAME: 'COMPANY-PRODUCT-dev-wus2-001-rg'
+  SQL_NAME: 'PRODUCT-dev-wus2-001-sql'
+  SQLDB_NAME: 'PRODUCT-dev-wus2-001-sqldb'
+
   API_ARTIFACT_OUTPUT: 'publish_output'
   WEB_ARTIFACT_OUTPUT: 'publish_web_output'
   API_ARTIFACT_NAME: 'api-artifact'
@@ -49,7 +57,7 @@ jobs:
     env:
       SCRIPTS_PATH: "./.github/scripts"
       SRC_PATH: "./src"
-      SRC_SLN: "COMPANY.PRODUCT.sln"
+      SRC_SLN: "COMPANY.PRODUCT.slnx"
       API_PATH: "Presentation.Api"
       API_PROJECT: "Presentation.Api.csproj"
       TEST_PATH: "Tests.Integration"
@@ -94,7 +102,8 @@ jobs:
       - name: pipeline environment configuration
         run: |
           echo "ASPNETCORE_ENVIRONMENT=${{ env.RUNTIME_ENV }}" >> $GITHUB_ENV
-          echo "OpenAI:ApiKey=${{ secrets.OPENAI_APIKEY }}" >> $GITHUB_ENV
+          echo "AzureOpenAI:Endpoint=${{ secrets.AZURE_OPENAI_ENDPOINT }}" >> $GITHUB_ENV
+          echo "AzureOpenAI:ApiKey=${{ secrets.AZURE_OPENAI_APIKEY }}" >> $GITHUB_ENV
         shell: pwsh
 
       - name: App Settings Variable Substitution
@@ -102,7 +111,8 @@ jobs:
         with:
           files: '${{ env.SRC_PATH }}/${{ env.API_PATH }}/appsettings.json, ${{ env.SRC_PATH }}/${{ env.API_PATH }}/appsettings.${{ env.RUNTIME_ENV }}.json, ${{ env.SRC_PATH }}/${{ env.TEST_PATH }}/appsettings.test.json'
         env: 
-          OpenAI.ApiKey: ${{ secrets.OPENAI_APIKEY }}
+          AzureOpenAI.Endpoint: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
+          AzureOpenAI.ApiKey: ${{ secrets.AZURE_OPENAI_APIKEY }}
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v4
@@ -200,13 +210,7 @@ jobs:
       matrix:
         DOTNET_VERSION: ["10.x"]
     env:
-      APPI_NAME: 'PRODUCT-dev-wus2-001-appi'
-      AZURE_APIAPP_NAME: 'PRODUCT-dev-wus2-001-api'
       AZURE_WEBAPP_PACKAGE_PATH: '.'
-      AZURE_WEBAPP_NAME: 'PRODUCT-dev-wus2-001-web'
-      AZURE_RG_NAME: 'COMPANY-PRODUCT-dev-wus2-001-rg'
-      SQL_NAME: 'PRODUCT-dev-wus2-001-sql'
-      SQLDB_NAME: 'PRODUCT-dev-wus2-001-sqldb'
       RUNTIME_ENV: "Development"
 
     steps:
@@ -268,7 +272,8 @@ jobs:
           az webapp config appsettings set -g ${{ env.AZURE_RG_NAME }} -n ${{ env.AZURE_APIAPP_NAME }} --settings ASPNETCORE_ENVIRONMENT=${{ env.RUNTIME_ENV }}          
           az webapp config appsettings set -g ${{ env.AZURE_RG_NAME }} -n ${{ env.AZURE_APIAPP_NAME }} --settings EntraExternalId:TenantId=${{ secrets.EEID_TENANT_ID }}
           az webapp config appsettings set -g ${{ env.AZURE_RG_NAME }} -n ${{ env.AZURE_APIAPP_NAME }} --settings EntraExternalId:ClientId=${{ secrets.API_CLIENT_ID }}
-          az webapp config appsettings set -g ${{ env.AZURE_RG_NAME }} -n ${{ env.AZURE_APIAPP_NAME }} --settings OpenAI:ApiKey=${{ secrets.OPENAI_APIKEY }}
+          az webapp config appsettings set -g ${{ env.AZURE_RG_NAME }} -n ${{ env.AZURE_APIAPP_NAME }} --settings AzureOpenAI:Endpoint=${{ secrets.AZURE_OPENAI_ENDPOINT }}
+          az webapp config appsettings set -g ${{ env.AZURE_RG_NAME }} -n ${{ env.AZURE_APIAPP_NAME }} --settings AzureOpenAI:ApiKey=${{ secrets.AZURE_OPENAI_APIKEY }}
         shell: pwsh
 
       - name: ${{ env.AZURE_APIAPP_NAME }} connection strings

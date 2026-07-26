@@ -33,6 +33,12 @@ permissions:
   security-events: write
 
 env:
+  # Manual environment-specific values (update these first)
+  SPOKE_RG_NAME: 'COMPANY-spoke-mgmt-dev-wus2-001-rg'
+  APPI_NAME: 'spoke-mgmt-dev-wus2-001-appi'
+  AZURE_APIAPP_NAME: PRODUCT-dev-wus2-001-api
+  AZURE_RG_NAME: 'COMPANY-PRODUCT-dev-wus2-001-rg'
+
   API_ARTIFACT_OUTPUT: 'publish_output'
   API_ARTIFACT_NAME: 'api-artifact'
 
@@ -50,7 +56,7 @@ jobs:
     env:
       SCRIPTS_PATH: "./.github/scripts"
       SRC_PATH: "./src"
-      SRC_SLN: "COMPANY.PRODUCT.sln"
+      SRC_SLN: "COMPANY.PRODUCT.slnx"
       API_PATH: "Presentation.Api"
       API_PROJECT: "Presentation.Api.csproj"
       TEST_PATH: "Tests.Integration"
@@ -149,10 +155,6 @@ jobs:
       matrix:
         DOTNET_VERSION: ["10.x"]
     env:
-      SPOKE_RG_NAME: 'COMPANY-spoke-mgmt-dev-wus2-001-rg'
-      APPI_NAME: 'spspoke-mgmt-dev-wus2-001-appi'
-      AZURE_APIAPP_NAME: PRODUCT-dev-wus2-001-api
-      AZURE_RG_NAME: 'COMPANY-PRODUCT-dev-wus2-001-rg'
       RUNTIME_ENV: "Development"
 
     steps:
