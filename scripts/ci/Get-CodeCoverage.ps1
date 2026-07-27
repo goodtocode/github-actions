@@ -4,6 +4,7 @@
 # Usage:
 #   .\.github\scripts\ci\Get-CodeCoverage.ps1
 #   .\.github\scripts\ci\Get-CodeCoverage.ps1 -TestRootPath .\src
+#   .\.github\scripts\ci\Get-CodeCoverage.ps1 -IncludeTests
 #   .\.github\scripts\ci\Get-CodeCoverage.ps1 -TestProjectFilter "*Tests.Integration.csproj" -Configuration Debug
 ####################################################################################
 
@@ -11,7 +12,8 @@ Param(
     [string]$TestRootPath = (Join-Path $PSScriptRoot '..\..\..\src'),
     [string]$TestProjectFilter = '*Tests*.csproj',
     [ValidateSet('Debug', 'Release')]
-    [string]$Configuration = 'Debug'
+    [string]$Configuration = 'Debug',
+    [switch]$IncludeTests
 )
 
 if ($IsWindows) {
@@ -52,6 +54,126 @@ function Get-CoverageColor {
     return 'Red'
 }
 
+function Get-ModuleDisplayName {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object]$Module
+    )
+
+    $name = [string]$Module.module_name
+    if ([string]::IsNullOrWhiteSpace($name)) {
+        $name = [string]$Module.name
+    }
+
+    if ([string]::IsNullOrWhiteSpace($name)) {
+        $name = [string]$Module.path
+    }
+
+    if ([string]::IsNullOrWhiteSpace($name)) {
+        $name = [string]$Module.id
+    }
+
+    if ([string]::IsNullOrWhiteSpace($name)) {
+        return '<unknown-module>'
+    }
+
+    return [System.IO.Path]::GetFileNameWithoutExtension($name)
+}
+
+function Test-IsTestArtifact {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Value
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Value)) {
+        return $false
+    }
+
+    return ($Value -match '(?i)(^|[.\\/_-])tests?([.\\/_-]|$)|integrationtests?')
+}
+
+function Get-FileCoverageFromModules {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object[]]$Modules,
+        [Parameter(Mandatory = $true)]
+        [string]$RepoRoot
+    )
+
+    $fileStats = @{}
+
+    foreach ($module in $Modules) {
+        $moduleName = Get-ModuleDisplayName -Module $module
+        $sourceFileById = @{}
+
+        $sourceFiles = @($module.source_files.source_file)
+        if ($sourceFiles.Count -eq 0) {
+            $sourceFiles = @($module.source_file_names.source_file)
+        }
+
+        foreach ($sourceFile in $sourceFiles) {
+            $sourceFileById[[string]$sourceFile.id] = [string]$sourceFile.path
+        }
+
+        foreach ($function in @($module.functions.function)) {
+            foreach ($range in @($function.ranges.range)) {
+                $sourceId = [string]$range.source_id
+                if ([string]::IsNullOrWhiteSpace($sourceId)) {
+                    continue
+                }
+
+                $sourcePath = $sourceFileById[$sourceId]
+                if ([string]::IsNullOrWhiteSpace($sourcePath)) {
+                    continue
+                }
+
+                if (-not $fileStats.ContainsKey($sourcePath)) {
+                    $fileStats[$sourcePath] = @{
+                        CoveredLines = @{}
+                        TotalLines = @{}
+                        Modules = @{}
+                    }
+                }
+
+                $startLine = [int]$range.start_line
+                $endLine = [int]$range.end_line
+                $isCovered = ([string]$range.covered -eq 'yes')
+
+                for ($line = $startLine; $line -le $endLine; $line++) {
+                    $fileStats[$sourcePath].TotalLines[$line] = $true
+                    if ($isCovered) {
+                        $fileStats[$sourcePath].CoveredLines[$line] = $true
+                    }
+                }
+
+                $fileStats[$sourcePath].Modules[$moduleName] = $true
+            }
+        }
+    }
+
+    $result = foreach ($path in $fileStats.Keys) {
+        $coveredCount = $fileStats[$path].CoveredLines.Count
+        $totalCount = $fileStats[$path].TotalLines.Count
+        $percent = if ($totalCount -eq 0) { 0 } else { [math]::Round(($coveredCount / [double]$totalCount) * 100, 2) }
+
+        $displayPath = $path
+        if ($path.StartsWith($RepoRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
+            $displayPath = $path.Substring($RepoRoot.Length).TrimStart('\')
+        }
+
+        [PSCustomObject]@{
+            Path = $displayPath
+            Covered = $coveredCount
+            Total = $totalCount
+            Percent = $percent
+            Modules = ($fileStats[$path].Modules.Keys | Sort-Object) -join ', '
+        }
+    }
+
+    return @($result)
+}
+
 function Resolve-TestRootPath {
     param(
         [Parameter(Mandatory = $true)]
@@ -83,6 +205,7 @@ function Resolve-TestRootPath {
 }
 
 $scriptDir = Get-Item -Path $PSScriptRoot
+$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..\..')).Path
 $resolvedRoot = Resolve-TestRootPath -ScriptDir $scriptDir -OverridePath $TestRootPath
 $resultsRoot = Join-Path $resolvedRoot 'TestResults\Coverage'
 New-Item -ItemType Directory -Force -Path $resultsRoot | Out-Null
@@ -153,7 +276,7 @@ $moduleCoverage = foreach ($module in $modules) {
     $moduleLinePct = if ($moduleLineTotal -eq 0) { 0 } else { [math]::Round((($moduleLineCovered + $moduleLinePartial) / [double]$moduleLineTotal) * 100, 2) }
 
     [PSCustomObject]@{
-        Name = [string]$module.module_name
+        Name = Get-ModuleDisplayName -Module $module
         Covered = $moduleLineCovered + $moduleLinePartial
         Total = $moduleLineTotal
         Percent = $moduleLinePct
@@ -161,12 +284,39 @@ $moduleCoverage = foreach ($module in $modules) {
 }
 
 $moduleCoverageSorted = $moduleCoverage | Sort-Object -Property Percent, Name
+
+$fileCoverage = Get-FileCoverageFromModules -Modules $modules -RepoRoot $repoRoot
+
+$moduleCoverageDisplay = if ($IncludeTests) {
+    $moduleCoverage
+} else {
+    $moduleCoverage | Where-Object { -not (Test-IsTestArtifact -Value $_.Name) }
+}
+
+$fileCoverageDisplay = if ($IncludeTests) {
+    $fileCoverage
+} else {
+    $fileCoverage | Where-Object {
+        (-not (Test-IsTestArtifact -Value $_.Path)) -and
+        (-not (Test-IsTestArtifact -Value $_.Modules))
+    }
+}
+
+$moduleCoverageSorted = $moduleCoverageDisplay | Sort-Object -Property Percent, Name
 $moduleCoverageTop = $moduleCoverageSorted | Select-Object -Last 5
 $moduleCoverageBottom = $moduleCoverageSorted | Select-Object -First 5
+
+$fileCoverageSorted = $fileCoverageDisplay | Sort-Object -Property Percent, Path
+$fileCoverageBottom = $fileCoverageSorted | Select-Object -First 10
 
 Write-Host ''
 Write-Host 'Coverage Summary' -ForegroundColor Cyan
 Write-Host '----------------' -ForegroundColor Cyan
+if ($IncludeTests) {
+    Write-Host 'Scope         : Including test projects and files' -ForegroundColor DarkGray
+} else {
+    Write-Host 'Scope         : Excluding test projects and files (use -IncludeTests to include)' -ForegroundColor DarkGray
+}
 
 $lineBar = Get-Bar -Percent $linePct
 $lineColor = Get-CoverageColor -Percent $linePct
@@ -177,21 +327,43 @@ $blockColor = Get-CoverageColor -Percent $blockPct
 Write-Host ("Block coverage: {0} {1}% ({2}/{3})" -f $blockBar, $blockPct, $blockCovered, $blockTotal) -ForegroundColor $blockColor
 
 Write-Host ''
-Write-Host 'Lowest Coverage Modules' -ForegroundColor Yellow
-Write-Host '-----------------------' -ForegroundColor Yellow
-foreach ($item in $moduleCoverageBottom) {
-    $itemBar = Get-Bar -Percent $item.Percent -Width 20
-    $itemColor = Get-CoverageColor -Percent $item.Percent
-    Write-Host ("{0,-40} {1} {2,6}% ({3}/{4})" -f $item.Name, $itemBar, $item.Percent, $item.Covered, $item.Total) -ForegroundColor $itemColor
+Write-Host 'Lowest Coverage Projects/Assemblies' -ForegroundColor Yellow
+Write-Host '-----------------------------------' -ForegroundColor Yellow
+if ($moduleCoverageBottom.Count -gt 0) {
+    foreach ($item in $moduleCoverageBottom) {
+        $itemBar = Get-Bar -Percent $item.Percent -Width 20
+        $itemColor = Get-CoverageColor -Percent $item.Percent
+        Write-Host ("{0,-40} {1} {2,6}% ({3}/{4})" -f $item.Name, $itemBar, $item.Percent, $item.Covered, $item.Total) -ForegroundColor $itemColor
+    }
+} else {
+    Write-Host 'No projects/assemblies available after filtering.' -ForegroundColor Yellow
 }
 
 Write-Host ''
-Write-Host 'Highest Coverage Modules' -ForegroundColor Green
-Write-Host '------------------------' -ForegroundColor Green
-foreach ($item in ($moduleCoverageTop | Sort-Object -Property Percent, Name -Descending)) {
-    $itemBar = Get-Bar -Percent $item.Percent -Width 20
-    $itemColor = Get-CoverageColor -Percent $item.Percent
-    Write-Host ("{0,-40} {1} {2,6}% ({3}/{4})" -f $item.Name, $itemBar, $item.Percent, $item.Covered, $item.Total) -ForegroundColor $itemColor
+Write-Host 'Highest Coverage Projects/Assemblies' -ForegroundColor Green
+Write-Host '------------------------------------' -ForegroundColor Green
+if ($moduleCoverageTop.Count -gt 0) {
+    foreach ($item in ($moduleCoverageTop | Sort-Object -Property Percent, Name -Descending)) {
+        $itemBar = Get-Bar -Percent $item.Percent -Width 20
+        $itemColor = Get-CoverageColor -Percent $item.Percent
+        Write-Host ("{0,-40} {1} {2,6}% ({3}/{4})" -f $item.Name, $itemBar, $item.Percent, $item.Covered, $item.Total) -ForegroundColor $itemColor
+    }
+} else {
+    Write-Host 'No projects/assemblies available after filtering.' -ForegroundColor Yellow
+}
+
+if ($fileCoverageBottom.Count -gt 0) {
+    Write-Host ''
+    Write-Host 'Lowest Coverage Files (Top 10 To Improve)' -ForegroundColor Magenta
+    Write-Host '-----------------------------------------' -ForegroundColor Magenta
+    foreach ($item in $fileCoverageBottom) {
+        $itemBar = Get-Bar -Percent $item.Percent -Width 16
+        $itemColor = Get-CoverageColor -Percent $item.Percent
+        Write-Host ("{0,-60} {1} {2,6}% ({3}/{4})" -f $item.Path, $itemBar, $item.Percent, $item.Covered, $item.Total) -ForegroundColor $itemColor
+    }
+} else {
+    Write-Host ''
+    Write-Host 'File-level coverage details were not available in this XML format.' -ForegroundColor Yellow
 }
 
 Write-Host ''
