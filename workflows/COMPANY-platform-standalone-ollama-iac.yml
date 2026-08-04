@@ -1,5 +1,9 @@
 name: 'Platform Spoke AI IaC'
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 on:
   pull_request:
     branches:
