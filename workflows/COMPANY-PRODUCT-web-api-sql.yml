@@ -81,15 +81,15 @@ jobs:
 
     steps:
       - name: checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: dotnet version ${{ matrix.DOTNET_VERSION }}
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: ${{ matrix.DOTNET_VERSION }}
 
       - name: Cache NuGet packages
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.nuget/packages
           key: nuget-${{ runner.os }}-${{ hashFiles('**/*.slnx', '**/*.csproj') }}
@@ -173,7 +173,7 @@ jobs:
         shell: pwsh
 
       - name: Upload migration script
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ env.MIGRATION_ARTIFACT_NAME }}
           path: ${{ env.MIGRATION_ARTIFACT_PATH }}
@@ -189,7 +189,7 @@ jobs:
         shell: pwsh
 
       - name: Upload Web API artifact      
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ env.API_ARTIFACT_NAME }}
           path: ${{ env.API_ARTIFACT_OUTPUT }}/**
@@ -201,7 +201,7 @@ jobs:
         shell: pwsh
 
       - name: Upload Blazor artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ env.WEB_ARTIFACT_NAME }}
           path: ${{ env.WEB_ARTIFACT_OUTPUT }}/**
@@ -228,26 +228,26 @@ jobs:
 
     steps:
       - name: Download Web API artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: ${{ env.API_ARTIFACT_NAME }}
           path: ${{ env.API_ARTIFACT_OUTPUT }}
 
       - name: Download Web Artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: ${{ env.WEB_ARTIFACT_NAME }}
           path: ${{ env.WEB_ARTIFACT_OUTPUT }}
 
       - name: Download migration script
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: ${{ env.MIGRATION_ARTIFACT_NAME }}
           path: ${{ env.MIGRATION_ARTIFACT_OUTPUT_PATH }}
 
 
       - name: az login
-        uses: azure/login@v2
+        uses: azure/login@v3
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
@@ -263,13 +263,13 @@ jobs:
         shell: pwsh
 
       - name: Deploy SQL script
-        uses: azure/sql-action@v2
+        uses: azure/sql-action@v2.4
         with:
           connection-string: ${{ steps.get_sql_conn.outputs.CONN_STR }}
           path: ${{ env.MIGRATION_ARTIFACT_PATH }}
 
       - name: Deploy Web API to Azure App Service
-        uses: azure/webapps-deploy@v2
+          uses: azure/webapps-deploy@v3
         with:
           app-name: ${{ env.AZURE_APIAPP_NAME }}
           package: ${{ env.API_ARTIFACT_OUTPUT }}
@@ -294,7 +294,7 @@ jobs:
         shell: pwsh
 
       - name: Deploy ${{ env.AZURE_WEBAPP_NAME }}
-        uses: azure/webapps-deploy@v2
+        uses: azure/webapps-deploy@v3
         with:
           app-name: ${{ env.AZURE_WEBAPP_NAME }}
           package: ${{ env.WEB_ARTIFACT_OUTPUT }}
