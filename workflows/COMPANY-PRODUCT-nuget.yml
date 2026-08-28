@@ -59,10 +59,10 @@ jobs:
 
     steps:
       - name: checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: dotnet version ${{ matrix.DOTNET_VERSION }}
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: ${{ matrix.DOTNET_VERSION }}
 
@@ -109,7 +109,7 @@ jobs:
         shell: pwsh
 
       - name: Upload NuGet package artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: nuget-package
           path: nupkg_output/*.nupkg
@@ -133,7 +133,7 @@ jobs:
       NUGET_OUTPUT: "nupkg_output"
     steps:
       - name: Download NuGet package artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: nuget-package
           path: ${{ env.NUGET_OUTPUT }}
