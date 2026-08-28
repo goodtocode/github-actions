@@ -1,0 +1,13 @@
+# Replace @OWNER with a real GitHub user or team before copying this file.
+# Use a team such as @ORG/platform when ownership is shared.
+
+# Default ownership
+* @OWNER
+
+# CI/CD, agent guidance, and repository automation
+/.github/ @OWNER
+/scripts/ @OWNER
+/workflows/ @OWNER
+
+# Infrastructure and deployment configuration
+/.azure/ @OWNER
