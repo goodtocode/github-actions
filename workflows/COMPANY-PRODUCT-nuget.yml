@@ -100,7 +100,7 @@ jobs:
         shell: pwsh
 
       - name: Test
-        run: dotnet build ${{ env.SRC_SLN }} --configuration ${{ env.CONFIGURATION }} --no-build
+        run: dotnet test ${{ env.SRC_SLN }} --configuration ${{ env.CONFIGURATION }} --no-build
         shell: pwsh
 
       - name: Pack NuGet package
