@@ -9,13 +9,13 @@ on:
     branches:
       - main
     paths:
-      - .github/workflows/COMPANY-PRODUCT-standalone-web-api-sql-openai.yml
+      - .github/workflows/PRODUCT-standalone-web-api-sql-openai.yml
       - src/**
   push:
     branches:
       - main
     paths:
-      - .github/workflows/COMPANY-PRODUCT-standalone-web-api-sql-openai.yml
+      - .github/workflows/PRODUCT-standalone-web-api-sql-openai.yml
       - src/**
   workflow_dispatch:
     inputs:
@@ -38,7 +38,7 @@ env:
   APPI_NAME: 'PRODUCT-dev-wus2-001-appi'
   AZURE_APIAPP_NAME: 'PRODUCT-dev-wus2-001-api'
   AZURE_WEBAPP_NAME: 'PRODUCT-dev-wus2-001-web'
-  AZURE_RG_NAME: 'COMPANY-PRODUCT-dev-wus2-001-rg'
+  AZURE_RG_NAME: 'PRODUCT-dev-wus2-001-rg'
   SQL_NAME: 'PRODUCT-dev-wus2-001-sql'
   SQLDB_NAME: 'PRODUCT-dev-wus2-001-sqldb'
 

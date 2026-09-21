@@ -9,13 +9,13 @@ on:
     branches:
       - main
     paths:
-      - .github/workflows/COMPANY-PRODUCT-nuget.yml
+      - .github/workflows/PRODUCT-nuget.yml
       - src/**
   push:
     branches:
       - main
     paths:
-      - .github/workflows/COMPANY-PRODUCT-nuget.yml
+      - .github/workflows/PRODUCT-nuget.yml
       - src/**
   workflow_dispatch:
     inputs:
