@@ -9,7 +9,7 @@ on:
     branches:
       - main
     paths:
-      - .github/workflows/COMPANY-platform-standalone-ollama-iac.yml
+      - .github/workflows/platform-standalone-ollama-iac.yml
       - .azure/**/*.bicep
       - .azure/**/*.bicepparam
       - .azure/**/*.bicepparams
@@ -17,7 +17,7 @@ on:
     branches:
       - main
     paths:
-      - .github/workflows/COMPANY-platform-standalone-ollama-iac.yml
+      - .github/workflows/platform-standalone-ollama-iac.yml
       - .azure/**/*.bicep
       - .azure/**/*.bicepparam
       - .azure/**/*.bicepparams
@@ -40,7 +40,7 @@ env:
   DOTNET_SYSTEM_GLOBALIZATION_INVARIANT: "true"
   SPOKE_LOCATION: "westus2"
   SPOKE_ENVIRONMENT: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.environment || 'development' }}
-  SPOKE_AI_RG_NAME: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'production' && 'COMPANY-spoke-ai-prod-wus2-001-rg' || 'COMPANY-spoke-ai-dev-wus2-001-rg' }}
+  SPOKE_AI_RG_NAME: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'production' && 'SCOPE-spoke-ai-prod-wus2-001-rg' || 'SCOPE-spoke-ai-dev-wus2-001-rg' }}
   SPOKE_AI_BICEP_TEMPLATE: ".azure/templates/platform-standalone-ai-ollama.bicep"
   SPOKE_AI_BICEP_PARAMETERS_DEV: ".azure/variables/platform-standalone-ai-ollama-dev.bicepparam"
   SPOKE_AI_BICEP_PARAMETERS_PROD: ".azure/variables/platform-standalone-ai-ollama-prod.bicepparam"
