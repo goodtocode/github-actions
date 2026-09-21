@@ -9,14 +9,14 @@ on:
     branches:
       - main
     paths:
-      - .github/workflows/COMPANY-platform-spoke-iac.yml
+      - .github/workflows/platform-spoke-iac.yml
       - .azure/**/*.bicep
       - .azure/**/*.bicepparams
   push:
     branches:
       - main
     paths:
-      - .github/workflows/COMPANY-platform-spoke-iac.yml
+      - .github/workflows/platform-spoke-iac.yml
       - .azure/**/*.bicep
       - .azure/**/*.bicepparams
   workflow_dispatch:
@@ -32,12 +32,12 @@ on:
 
 env:
   DOTNET_SYSTEM_GLOBALIZATION_INVARIANT: "true"
-  HUB_MGMT_RG_NAME: "COMPANY-hub-mgmt-plat-wus2-001-rg"
+  HUB_MGMT_RG_NAME: "SCOPE-hub-mgmt-plat-wus2-001-rg"
   SPOKE_LOCATION: "westus2"
-  SPOKE_NETWORK_RG_NAME: "COMPANY-spoke-network-dev-wus2-001-rg"
+  SPOKE_NETWORK_RG_NAME: "SCOPE-spoke-network-dev-wus2-001-rg"
   SPOKE_NETWORK_BICEP_TEMPLATE: ".azure/templates/platform-spoke-network-publicroute.bicep"
   SPOKE_NETWORK_BICEP_PARAMETERS: ".azure/variables/platform-spoke-network-publicroute-dev.bicepparam" 
-  SPOKE_MGMT_RG_NAME: "COMPANY-spoke-mgmt-dev-wus2-001-rg"
+  SPOKE_MGMT_RG_NAME: "SCOPE-spoke-mgmt-dev-wus2-001-rg"
   SPOKE_MGMT_BICEP_TEMPLATE: ".azure/templates/platform-spoke-mgmt.bicep"
   SPOKE_MGMT_BICEP_PARAMETERS: ".azure/variables/platform-spoke-mgmt-dev.bicepparam"
   

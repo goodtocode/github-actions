@@ -9,14 +9,14 @@ on:
     branches:
       - main
     paths:
-      - .github/workflows/COMPANY-PRODUCT-iac.yml
+      - .github/workflows/PRODUCT-iac.yml
       - .azure/**/*.bicep
       - .azure/**/*.bicepparams
   push:
     branches:
       - main
     paths:
-      - .github/workflows/COMPANY-PRODUCT-iac.yml
+      - .github/workflows/PRODUCT-iac.yml
       - .azure/**/*.bicep
       - .azure/**/*.bicepparams
   workflow_dispatch:
@@ -32,11 +32,11 @@ on:
 
 env:
   DOTNET_SYSTEM_GLOBALIZATION_INVARIANT: "true"
-  SPOKE_MGMT_RG_NAME: "COMPANY-spoke-mgmt-dev-wus2-001-rg"
+  SPOKE_MGMT_RG_NAME: "SCOPE-spoke-mgmt-dev-wus2-001-rg"
   SPOKE_MGMT_RG_LOCATION: "westus2"
   SPOKE_BICEP_TEMPLATE: ".azure/templates/platform-spoke-mgmt.bicep"
   SPOKE_BICEP_PARAMETERS: ".azure/variables/platform-spoke-mgmt-dev.bicepparam"
-  PRODUCT_RG_NAME: "COMPANY-PRODUCT-dev-wus2-001-rg"
+  PRODUCT_RG_NAME: "PRODUCT-dev-wus2-001-rg"
   PRODUCT_RG_LOCATION: "westus2"
   PRODUCT_BICEP_TEMPLATE: ".azure/templates/landingzone-web-api-sql.bicep"
   PRODUCT_BICEP_PARAMETERS: ".azure/variables/landingzone-web-api-sql-dev.bicepparam"

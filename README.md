@@ -17,11 +17,11 @@ These templates help you:
 
 | File | Purpose |
 |------|---------|
-| COMPANY-PRODUCT-api.yml | CI/CD for .NET Web API (build, test, deploy to Azure App Service) |
-| COMPANY-PRODUCT-api-sql.yml | CI/CD for .NET Web API with Azure SQL (includes DB migration) |
-| COMPANY-PRODUCT-iac.yml | Deploy Azure infrastructure using Bicep templates |
-| COMPANY-PRODUCT-stapp-ci-cd.yml | CI/CD for Azure Static Web Apps (Blazor, SPA, etc.) |
-| COMPANY-PRODUCT-nuget.yml | Build, test, and publish NuGet packages |
+| PRODUCT-api.yml | CI/CD for .NET Web API (build, test, deploy to Azure App Service) |
+| PRODUCT-api-sql.yml | CI/CD for .NET Web API with Azure SQL (includes DB migration) |
+| PRODUCT-iac.yml | Deploy Azure infrastructure using Bicep templates |
+| PRODUCT-stapp-ci-cd.yml | CI/CD for Azure Static Web Apps (Blazor, SPA, etc.) |
+| PRODUCT-nuget.yml | Build, test, and publish NuGet packages |
 
 ### Triggers
 All workflow YAML files in this repo are designed to:
@@ -30,11 +30,11 @@ All workflow YAML files in this repo are designed to:
 
 | Workflow File                        | Purpose                                                                                 | CI Trigger (PR)         | CD Trigger (Push to main) |
 |--------------------------------------|-----------------------------------------------------------------------------------------|-------------------------|---------------------------|
-| `COMPANY-PRODUCT-api.yml`            | CI/CD for .NET Web API (build, test, deploy to Azure App Service)                       | Yes                    | Yes                      |
-| `COMPANY-PRODUCT-api-sql.yml`        | CI/CD for .NET Web API with Azure SQL (includes DB migration)                           | Yes                    | Yes                      |
-| `COMPANY-PRODUCT-iac.yml`            | Deploy Azure infrastructure using Bicep templates                                       | Yes                    | Yes                      |
-| `COMPANY-PRODUCT-stapp-ci-cd.yml`    | CI/CD for Azure Static Web Apps (Blazor, SPA, etc.)                                     | Yes                    | Yes                      |
-| `COMPANY-PRODUCT-nuget.yml`          | Build, test, and publish NuGet packages                                                 | Yes                    | Yes                      |
+| `PRODUCT-api.yml`            | CI/CD for .NET Web API (build, test, deploy to Azure App Service)                       | Yes                    | Yes                      |
+| `PRODUCT-api-sql.yml`        | CI/CD for .NET Web API with Azure SQL (includes DB migration)                           | Yes                    | Yes                      |
+| `PRODUCT-iac.yml`            | Deploy Azure infrastructure using Bicep templates                                       | Yes                    | Yes                      |
+| `PRODUCT-stapp-ci-cd.yml`    | CI/CD for Azure Static Web Apps (Blazor, SPA, etc.)                                     | Yes                    | Yes                      |
+| `PRODUCT-nuget.yml`          | Build, test, and publish NuGet packages                                                 | Yes                    | Yes                      |
 
 ### Scripts (`/scripts`)
 
@@ -53,19 +53,19 @@ Scripts are organized by function:
 5. **Push changes to trigger the workflows.**
 
 ### Example: Deploying a .NET Web API to Azure
-- Use `COMPANY-PRODUCT-api.yml` or `COMPANY-PRODUCT-api-sql.yml` for CI/CD.
+- Use `PRODUCT-api.yml` or `PRODUCT-api-sql.yml` for CI/CD.
 - Ensure your repo contains a `.sln` and project files in the expected structure.
 - Add secrets: `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`, and (for SQL) `SQL_ADMIN_USER`, `SQL_ADMIN_PASSWORD`.
 - The workflow will build, test, publish, and deploy your app to Azure App Service, and (if using SQL) run EF Core migrations.
 
 ### Example: Deploying Infrastructure with Bicep
-- Use `COMPANY-PRODUCT-iac.yml`.
+- Use `PRODUCT-iac.yml`.
 - Place your Bicep templates and parameter files in the `.azure/` directory.
 - Add Azure credentials as secrets.
 - The workflow will create/validate/deploy resource groups and Bicep templates.
 
 ### Example: Publishing a NuGet Package
-- Use `COMPANY-PRODUCT-nuget.yml`.
+- Use `PRODUCT-nuget.yml`.
 - Add your NuGet API key as a secret (`NUGET_API_KEY`).
 - The workflow will build, test, pack, and publish your package to NuGet.org.
 

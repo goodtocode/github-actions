@@ -9,13 +9,13 @@ on:
     branches:
       - main
     paths:
-      - .github/workflows/COMPANY-PRODUCT-web-api-sql.yml
+      - .github/workflows/PRODUCT-web-api-sql.yml
       - src/**
   push:
     branches:
       - main
     paths:
-      - .github/workflows/COMPANY-PRODUCT-web-api-sql.yml
+      - .github/workflows/PRODUCT-web-api-sql.yml
       - src/**
   workflow_dispatch:
     inputs:
@@ -35,11 +35,11 @@ permissions:
 
 env:
   # Manual environment-specific values (update these first)
-  SPOKE_RG_NAME: 'COMPANY-spoke-mgmt-dev-wus2-001-rg'
+  SPOKE_RG_NAME: 'SCOPE-spoke-mgmt-dev-wus2-001-rg'
   APPI_NAME: 'spoke-mgmt-dev-wus2-001-appi'
   AZURE_APIAPP_NAME: PRODUCT-dev-wus2-001-api
   AZURE_WEBAPP_NAME: PRODUCT-dev-wus2-001-web
-  AZURE_RG_NAME: 'COMPANY-PRODUCT-dev-wus2-001-rg'
+  AZURE_RG_NAME: 'PRODUCT-dev-wus2-001-rg'
   SQL_NAME: 'PRODUCT-dev-wus2-001-sql'
   SQLDB_NAME: 'PRODUCT-dev-wus2-001-sqldb'
 
