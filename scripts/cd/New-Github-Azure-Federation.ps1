@@ -6,7 +6,7 @@
 #   3. Change directory to the script folder:
 #      CD C:\Scripts (wherever your script is)
 #   4. In powershell, run script: 
-#      .\New-Github-Azure-Federation.ps1  -TenantId 12343dac-0e69-436a-866b-456727dd3579 -SubscriptionId 12343dac-0e69-436a-866b-456727dd3579 -PrincipalName myco-github-devtest-100 -Organization mygithuborg -Repository mygithubrepo -Environment development
+#      .\New-Github-Azure-Federation.ps1  -TenantId 12343dac-0e69-436a-866b-456727dd3579 -SubscriptionId 12343dac-0e69-436a-866b-456727dd3579 -PrincipalName myco-github-development-100 -Organization mygithuborg -Repository mygithubrepo -Environment development
 ####################################################################################
 
 param (

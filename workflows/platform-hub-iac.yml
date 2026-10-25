@@ -31,12 +31,15 @@ on:
         default: "false"
 
 env:
-  DOTNET_SYSTEM_GLOBALIZATION_INVARIANT: "true"
+  # ===== EDIT PER INSTALL: naming slots =====
+  SCOPE: "SCOPE"        # tenant/org prefix, e.g. cen
+  REGION: "wus2"        # region short code in names
+  INSTANCE: "001"       # instance number in names
   HUB_LOCATION: "westus2"
-  HUB_NETWORK_RG_NAME: "SCOPE-hub-network-plat-wus2-001-rg"
+  # ==========================================
+  DOTNET_SYSTEM_GLOBALIZATION_INVARIANT: "true"
   HUB_NETWORK_BICEP_TEMPLATE: ".azure/templates/platform-hub-network-publicroute.bicep"
   HUB_NETWORK_BICEP_PARAMETERS: ".azure/variables/platform-hub-network-publicroute-plat.bicepparam"
-  HUB_MGMT_RG_NAME: "SCOPE-hub-mgmt-plat-wus2-001-rg"
   HUB_MGMT_BICEP_TEMPLATE: ".azure/templates/platform-hub-mgmt.bicep"
   HUB_MGMT_BICEP_PARAMETERS: ".azure/variables/platform-hub-mgmt-plat.bicepparam"
   
@@ -55,6 +58,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
+      # Hard-code any resource group name here if it does not follow the slot pattern.
+      - name: Resolve resource group names
+        shell: bash
+        run: |
+          {
+            echo "HUB_NETWORK_RG_NAME=${SCOPE}-hub-network-plat-${REGION}-${INSTANCE}-rg"
+            echo "HUB_MGMT_RG_NAME=${SCOPE}-hub-mgmt-plat-${REGION}-${INSTANCE}-rg"
+          } >> "$GITHUB_ENV"
+
       - name: "Az CLI login"
         uses: azure/login@v3
         with:
@@ -68,7 +80,7 @@ jobs:
           inlineScript: |
             az group create -n ${{ env.HUB_NETWORK_RG_NAME }} -l ${{ env.HUB_LOCATION }}
 
-          uses: Azure/cli@v3
+      - name: Validate ${{ env.HUB_NETWORK_RG_NAME }}
         uses: Azure/cli@v3
         with:
           inlineScript: |
@@ -97,6 +109,14 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+
+      - name: Resolve resource group names
+        shell: bash
+        run: |
+          {
+            echo "HUB_NETWORK_RG_NAME=${SCOPE}-hub-network-plat-${REGION}-${INSTANCE}-rg"
+            echo "HUB_MGMT_RG_NAME=${SCOPE}-hub-mgmt-plat-${REGION}-${INSTANCE}-rg"
+          } >> "$GITHUB_ENV"
 
       - name: "Az CLI login"
         uses: azure/login@v3
