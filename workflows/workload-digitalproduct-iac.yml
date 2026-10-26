@@ -1,0 +1,149 @@
+name: 'Workload Digital Product IaC'
+
+# One pipeline for every mode and phase. The mode picks the parameter file; the environment matrix
+# runs development first, then production behind the 'production' environment's required reviewers.
+# Zero-trust (mode 4) must run from a runner inside the VNet.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/workload-digitalproduct-iac.yml
+      - .azure/**/*.bicep
+      - .azure/**/*.bicepparam
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/workload-digitalproduct-iac.yml
+      - .azure/**/*.bicep
+      - .azure/**/*.bicepparam
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Environment to run"
+        type: choice
+        options:
+          - development
+          - production
+          - all
+        required: true
+        default: "development"
+      runcd:
+        description: "Run CD pipeline"
+        required: true
+        default: "false"
+
+env:
+  # ===== EDIT PER INSTALL: naming slots (RG: {product/purpose}-{env}-{region}-{instance}-rg) =====
+  PRODUCT: "PRODUCT"
+  REGION: "wus2"
+  INSTANCE: "001"
+  LOCATION: "westus2"
+  # standalone | shared | network | zerotrust
+  MODE: "shared"
+  # ===============================================================================================
+  DOTNET_SYSTEM_GLOBALIZATION_INVARIANT: "true"
+
+permissions:
+  id-token: write
+  contents: read
+  security-events: write
+
+jobs:
+  plan:
+    name: "Select environments"
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+      deploy: ${{ steps.plan.outputs.deploy }}
+    steps:
+      - name: Plan
+        id: plan
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_ENVIRONMENT: ${{ github.event.inputs.environment }}
+          INPUT_RUNCD: ${{ github.event.inputs.runcd }}
+        run: |
+          dev='{"environment":"development","short":"dev","rgenv":"dev"}'
+          prod='{"environment":"production","short":"prod","rgenv":"prod"}'
+          deploy=false
+          case "$EVENT_NAME" in
+            pull_request) list="$dev" ;;
+            push) list="$dev,$prod"; deploy=true ;;
+            *)
+              case "$INPUT_ENVIRONMENT" in
+                production) list="$prod" ;;
+                all) list="$dev,$prod" ;;
+                *) list="$dev" ;;
+              esac
+              [ "$INPUT_RUNCD" = "true" ] && deploy=true
+              ;;
+          esac
+          echo "matrix={\"include\":[$list]}" >> "$GITHUB_OUTPUT"
+          echo "deploy=$deploy" >> "$GITHUB_OUTPUT"
+
+  # Single-environment users: remove the unused entry from the plan step above.
+  product:
+    name: "Product IaC (${{ matrix.environment }})"
+    runs-on: ubuntu-latest
+    needs: plan
+    environment: ${{ matrix.environment }}
+    strategy:
+      fail-fast: true
+      max-parallel: 1
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      # Hard-code the resource group name here if it does not follow the slot pattern.
+      - name: Resolve names
+        shell: bash
+        run: |
+          {
+            echo "PRODUCT_RG_NAME=${PRODUCT}-${{ matrix.rgenv }}-${REGION}-${INSTANCE}-rg"
+            if [ "$MODE" = "zerotrust" ]; then
+              echo "PRODUCT_BICEP_TEMPLATE=.azure/templates/workload-digitalproduct-zerotrust.bicep"
+            else
+              echo "PRODUCT_BICEP_TEMPLATE=.azure/templates/workload-digitalproduct.bicep"
+            fi
+            echo "PRODUCT_BICEP_PARAMETERS=.azure/variables/workload-digitalproduct-${MODE}-${{ matrix.short }}.bicepparam"
+          } >> "$GITHUB_ENV"
+
+      - name: "Az CLI login"
+        uses: azure/login@v3
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Create ${{ env.PRODUCT_RG_NAME }}
+        uses: Azure/cli@v3
+        with:
+          inlineScript: |
+            az group create -n ${{ env.PRODUCT_RG_NAME }} -l ${{ env.LOCATION }}
+
+      - name: Validate ${{ env.PRODUCT_RG_NAME }}
+        uses: Azure/cli@v3
+        env:
+          SQL_ADMIN_USER: ${{ secrets.SQL_ADMIN_USER }}
+          SQL_ADMIN_PASSWORD: ${{ secrets.SQL_ADMIN_PASSWORD }}
+        with:
+          inlineScript: |
+            az deployment group what-if --resource-group ${{ env.PRODUCT_RG_NAME }} --template-file ${{ env.PRODUCT_BICEP_TEMPLATE }} --parameters ${{ env.PRODUCT_BICEP_PARAMETERS }}
+
+      - name: Deploy ${{ env.PRODUCT_RG_NAME }}
+        if: needs.plan.outputs.deploy == 'true'
+        uses: Azure/cli@v3
+        env:
+          SQL_ADMIN_USER: ${{ secrets.SQL_ADMIN_USER }}
+          SQL_ADMIN_PASSWORD: ${{ secrets.SQL_ADMIN_PASSWORD }}
+        with:
+          inlineScript: |
+            az deployment group create --resource-group ${{ env.PRODUCT_RG_NAME }} --template-file ${{ env.PRODUCT_BICEP_TEMPLATE }} --parameters ${{ env.PRODUCT_BICEP_PARAMETERS }}
