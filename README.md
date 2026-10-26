@@ -55,25 +55,29 @@ All workflow YAML files in this repo are designed to:
 
 ### GitHub to Azure federation
 
-Pipelines log in with OpenID Connect, so no secret is stored. Create one identity per repository and GitHub environment (one subscription each) with `scripts/cd/New-Github-Azure-Federation.ps1`. Run it as an administrator:
+Pipelines log in with OpenID Connect, so no secret is stored. Use one app registration per repository, named `github-<repo>`, and run `scripts/cd/New-Github-Azure-Federation.ps1` once per environment with the same `-PrincipalName`. Each run signs in to that environment's subscription, grants the app Contributor there, and appends a federated credential for that environment to the same app registration. Run it as an administrator, after `gh auth login` (the script looks up the numeric GitHub org and repo IDs).
 
 ```powershell
-.\New-Github-Azure-Federation.ps1 -TenantId <tenant-guid> -SubscriptionId <subscription-guid> `
-  -PrincipalName github-<repo>-<environment>-<instance> -Organization <org> -Repository <repo> -Environment <environment>
+.\New-Github-Azure-Federation.ps1 -TenantId <tenant-guid> -SubscriptionId <platform-subscription-guid> `
+  -PrincipalName github-<repo> -Organization <org> -Repository <repo> -Environment platform
+
+.\New-Github-Azure-Federation.ps1 -TenantId <tenant-guid> -SubscriptionId <development-subscription-guid> `
+  -PrincipalName github-<repo> -Organization <org> -Repository <repo> -Environment development
 ```
 
-| Repo | `-Environment` | Subscription | `-PrincipalName` |
-| --- | --- | --- | --- |
-| platform | `platform` | platform | `github-platform-azure-platform-100` |
-| platform | `development` | development | `github-platform-azure-development-100` |
-| platform | `production` | production | `github-platform-azure-production-100` |
-| product | `development` | development | `github-<product>-development-100` |
-| product | `production` | production | `github-<product>-production-100` |
+| Repo | Run | `-Environment` | `-SubscriptionId` | `-PrincipalName` |
+| --- | --- | --- | --- | --- |
+| platform | 1 | `platform` | platform | `github-platform-azure` |
+| platform | 2 | `development` | development | `github-platform-azure` |
+| platform | 3 | `production` | production | `github-platform-azure` |
+| product | 1 | `development` | development | `github-<product>` |
+| product | 2 | `production` | production | `github-<product>` |
 
-- `-Environment` is the GitHub environment name and must exist in the repository. Pipelines that set `environment:` present the subject `repo:<org>/<repo>:environment:<environment>`.
-- Make `-PrincipalName` unique per repository and environment. The script reuses an app registration with the same name, so a shared name silently skips the second repository's credential.
-- The script assigns Contributor on the subscription, adds an environment credential, and also adds `main` and `pull_request` credentials. Those two bypass environment protection, so remove them for production.
-- It prints `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID` and `AZURE_CLIENT_ID`. Save them as secrets on that GitHub environment, not on the repository.
+- `-Environment` is the GitHub environment name and must exist in the repository. It accepts a list, but each run must use the subscription of its environments. Pipelines that set `environment:` present a subject for that environment, and the script adds one credential named `<PrincipalName>-env-<environment>` per environment. Rerunning is safe.
+- Use a different `-PrincipalName` for each repository. Two repositories sharing one app registration would share its credentials and roles.
+- The app registration is the same across environments, so `AZURE_CLIENT_ID` and `AZURE_TENANT_ID` are the same value everywhere. `AZURE_SUBSCRIPTION_ID` differs. Because the app has Contributor on every subscription you ran it for, a workflow that can log in as the app could target any of them. Protect `production` with required reviewers and restrict who can edit workflows, or use a separate app registration per environment if you need a hard boundary.
+- The script also adds `main` and `pull_request` credentials. Those do not go through environment protection, so remove them if every job sets `environment:`.
+- It prints `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID` and `AZURE_CLIENT_ID`. Save them as secrets on the matching GitHub environment, not on the repository.
 
 ### Scripts (`/scripts`)
 
