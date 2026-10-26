@@ -22,6 +22,22 @@ These templates help you:
 | PRODUCT-iac.yml | Deploy Azure infrastructure using Bicep templates |
 | PRODUCT-stapp-ci-cd.yml | CI/CD for Azure Static Web Apps (Blazor, SPA, etc.) |
 | PRODUCT-nuget.yml | Build, test, and publish NuGet packages |
+| platform-edge-iac.yml | Phase 2 platform edge (Front Door) in the platform subscription |
+| platform-mgmt-iac.yml | Phase 2 shared management, development then production |
+| platform-hub-iac.yml, platform-spoke-iac.yml | Phase 3 and 4 hub and spoke network |
+
+### Maturity roadmap pipelines
+
+Each phase adds to the previous one. Pick the phase that fits and copy only its pipelines. Resource groups follow `{product/purpose}-{env}-{region}-{instance}-rg`, set in the naming slots at the top of each workflow.
+
+| Phase | Subscriptions | Pipelines | GitHub environments |
+| --- | --- | --- | --- |
+| 1. Cloud native startup | 1 | `PRODUCT-standalone-iac.yml` | `development` |
+| 2. Subscription segmentation | platform, development, production | `platform-edge-iac.yml`, `platform-mgmt-iac.yml`, `PRODUCT-iac.yml` | `platform`, `development`, `production` |
+| 3. Enterprise network foundation | same | Phase 2 plus `platform-hub-iac.yml`, `platform-spoke-iac.yml` | same |
+| 4. Zero trust private services | same | Phase 3 with the zero-trust templates | same |
+
+Environment pipelines run development first, then production behind the required reviewers of the `production` environment. Create one Azure identity per environment with `scripts/cd/New-Github-Azure-Federation.ps1`.
 
 ### Triggers
 All workflow YAML files in this repo are designed to:

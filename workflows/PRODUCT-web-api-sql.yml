@@ -35,8 +35,8 @@ permissions:
 
 env:
   # Manual environment-specific values (update these first)
-  SPOKE_RG_NAME: 'SCOPE-spoke-mgmt-dev-wus2-001-rg'
-  APPI_NAME: 'spoke-mgmt-dev-wus2-001-appi'
+  SPOKE_RG_NAME: 'mgmt-dev-wus2-001-rg'
+  APPI_NAME: 'mgmt-dev-wus2-001-appi'
   AZURE_APIAPP_NAME: PRODUCT-dev-wus2-001-api
   AZURE_WEBAPP_NAME: PRODUCT-dev-wus2-001-web
   AZURE_RG_NAME: 'PRODUCT-dev-wus2-001-rg'

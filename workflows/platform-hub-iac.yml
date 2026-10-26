@@ -63,8 +63,8 @@ jobs:
         shell: bash
         run: |
           {
-            echo "HUB_NETWORK_RG_NAME=${SCOPE}-hub-network-plat-${REGION}-${INSTANCE}-rg"
-            echo "HUB_MGMT_RG_NAME=${SCOPE}-hub-mgmt-plat-${REGION}-${INSTANCE}-rg"
+            echo "HUB_NETWORK_RG_NAME=network-plat-${REGION}-${INSTANCE}-rg"
+            echo "HUB_MGMT_RG_NAME=mgmt-plat-${REGION}-${INSTANCE}-rg"
           } >> "$GITHUB_ENV"
 
       - name: "Az CLI login"
@@ -114,8 +114,8 @@ jobs:
         shell: bash
         run: |
           {
-            echo "HUB_NETWORK_RG_NAME=${SCOPE}-hub-network-plat-${REGION}-${INSTANCE}-rg"
-            echo "HUB_MGMT_RG_NAME=${SCOPE}-hub-mgmt-plat-${REGION}-${INSTANCE}-rg"
+            echo "HUB_NETWORK_RG_NAME=network-plat-${REGION}-${INSTANCE}-rg"
+            echo "HUB_MGMT_RG_NAME=mgmt-plat-${REGION}-${INSTANCE}-rg"
           } >> "$GITHUB_ENV"
 
       - name: "Az CLI login"

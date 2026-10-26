@@ -46,7 +46,7 @@ env:
   # ==========================================
   DOTNET_SYSTEM_GLOBALIZATION_INVARIANT: "true"
   SPOKE_NETWORK_BICEP_TEMPLATE: ".azure/templates/platform-spoke-network-publicroute.bicep"
-  SPOKE_MGMT_BICEP_TEMPLATE: ".azure/templates/platform-spoke-mgmt.bicep"
+  SPOKE_MGMT_BICEP_TEMPLATE: ".azure/templates/platform-mgmt.bicep"
 
 permissions:
   id-token: write
@@ -101,7 +101,7 @@ jobs:
       matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
     env:
       SPOKE_NETWORK_BICEP_PARAMETERS: .azure/variables/platform-spoke-network-publicroute-${{ matrix.short }}.bicepparam
-      SPOKE_MGMT_BICEP_PARAMETERS: .azure/variables/platform-spoke-mgmt-${{ matrix.short }}.bicepparam
+      SPOKE_MGMT_BICEP_PARAMETERS: .azure/variables/platform-mgmt-${{ matrix.short }}.bicepparam
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -111,9 +111,9 @@ jobs:
         shell: bash
         run: |
           {
-            echo "HUB_MGMT_RG_NAME=${SCOPE}-hub-mgmt-plat-${REGION}-${INSTANCE}-rg"
-            echo "SPOKE_NETWORK_RG_NAME=${SCOPE}-spoke-network-${{ matrix.short }}-${REGION}-${INSTANCE}-rg"
-            echo "SPOKE_MGMT_RG_NAME=${SCOPE}-spoke-mgmt-${{ matrix.short }}-${REGION}-${INSTANCE}-rg"
+            echo "HUB_MGMT_RG_NAME=mgmt-plat-${REGION}-${INSTANCE}-rg"
+            echo "SPOKE_NETWORK_RG_NAME=network-${{ matrix.short }}-${REGION}-${INSTANCE}-rg"
+            echo "SPOKE_MGMT_RG_NAME=mgmt-${{ matrix.short }}-${REGION}-${INSTANCE}-rg"
           } >> "$GITHUB_ENV"
 
       - name: "Az CLI login"
