@@ -21,8 +21,8 @@ param (
    [Parameter(Mandatory = $true, ValueFromPipelineByPropertyName = $true)]
    [string]$Repository = $(throw '-Repository is a required parameter.'), #GitHub Repository Name
    [Parameter(Mandatory = $true, ValueFromPipelineByPropertyName = $true)]
-   [string[]]$Environment = $(throw '-Environment is a required parameter.') #GitHub Repository Environment(s): development, production
-)
+   [string[]]$Environment = $(throw    '-Environment is a required parameter.') #GitHub Repository Environment(s): development, production
+   )
 ####################################################################################
 Set-ExecutionPolicy Unrestricted -Scope Process -Force
 $VerbosePreference = 'SilentlyContinue' # 'SilentlyContinue' # 'Continue'
