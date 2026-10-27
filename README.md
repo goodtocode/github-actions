@@ -15,13 +15,32 @@ These templates help you:
 
 ### Workflows (`/workflows`)
 
+Workflows are named after the `.azure` templates they deploy: `{platform|workload-<archetype>|package}-{capability}[-{variant}].yml`. Mode, environment and components are variables, not separate files.
+
 | File | Purpose |
 |------|---------|
-| PRODUCT-api.yml | CI/CD for .NET Web API (build, test, deploy to Azure App Service) |
-| PRODUCT-api-sql.yml | CI/CD for .NET Web API with Azure SQL (includes DB migration) |
-| PRODUCT-iac.yml | Deploy Azure infrastructure using Bicep templates |
-| PRODUCT-stapp-ci-cd.yml | CI/CD for Azure Static Web Apps (Blazor, SPA, etc.) |
-| PRODUCT-nuget.yml | Build, test, and publish NuGet packages |
+| `workload-digitalproduct-iac.yml` | Deploy a digital product (any mode: standalone, shared, network, zerotrust), development then production |
+| `workload-digitalproduct-app.yml` | Build, test and deploy web, API and SQL migrations; components switched by `HAS_WEB`, `HAS_API`, `HAS_SQL` |
+| `platform-edge-iac.yml` | Phase 2 platform edge (Front Door) in the platform subscription |
+| `platform-mgmt-iac.yml` | Phase 2 shared management, development then production |
+| `platform-ai-iac.yml` | Azure AI (Foundry or Ollama) in the product's resource group; `AI_VARIANT` picks the template |
+| `platform-hub-iac.yml`, `platform-spoke-iac.yml` | Phase 3 and 4 hub and spoke network |
+| `package-nuget.yml` | Build, test, and publish NuGet packages |
+
+Consumer repos rename `workload-digitalproduct-*` to the product name, for example `crucible-iac.yml` and `crucible-app.yml`.
+
+### Maturity roadmap pipelines
+
+Each phase adds to the previous one. Pick the phase that fits and copy only its pipelines. Resource groups follow `{product/purpose}-{env}-{region}-{instance}-rg`, set in the naming slots at the top of each workflow.
+
+| Phase | Subscriptions | Pipelines | GitHub environments |
+| --- | --- | --- | --- |
+| 1. Cloud native startup | 1 | `workload-digitalproduct-iac.yml` (`MODE: standalone`), `workload-digitalproduct-app.yml` | `development` |
+| 2. Subscription segmentation | platform, development, production | `platform-edge-iac.yml`, `platform-mgmt-iac.yml`, `workload-digitalproduct-iac.yml` (`MODE: shared`), `workload-digitalproduct-app.yml`, optional `platform-ai-iac.yml` | `platform`, `development`, `production` |
+| 3. Enterprise network foundation | same | Phase 2 plus `platform-hub-iac.yml`, `platform-spoke-iac.yml` | same |
+| 4. Zero trust private services | same | Phase 3 with the zero-trust templates | same |
+
+Environment pipelines run development first, then production behind the required reviewers of the `production` environment. Create one Azure identity per environment with `scripts/cd/New-Github-Azure-Federation.ps1`.
 
 ### Triggers
 All workflow YAML files in this repo are designed to:
@@ -30,11 +49,35 @@ All workflow YAML files in this repo are designed to:
 
 | Workflow File                        | Purpose                                                                                 | CI Trigger (PR)         | CD Trigger (Push to main) |
 |--------------------------------------|-----------------------------------------------------------------------------------------|-------------------------|---------------------------|
-| `PRODUCT-api.yml`            | CI/CD for .NET Web API (build, test, deploy to Azure App Service)                       | Yes                    | Yes                      |
-| `PRODUCT-api-sql.yml`        | CI/CD for .NET Web API with Azure SQL (includes DB migration)                           | Yes                    | Yes                      |
-| `PRODUCT-iac.yml`            | Deploy Azure infrastructure using Bicep templates                                       | Yes                    | Yes                      |
-| `PRODUCT-stapp-ci-cd.yml`    | CI/CD for Azure Static Web Apps (Blazor, SPA, etc.)                                     | Yes                    | Yes                      |
-| `PRODUCT-nuget.yml`          | Build, test, and publish NuGet packages                                                 | Yes                    | Yes                      |
+| `workload-digitalproduct-app.yml` | Build, test and deploy web, API and SQL migrations                                 | Yes                    | Yes                      |
+| `workload-digitalproduct-iac.yml` | Deploy a digital product with Bicep                                                | Yes (what-if)          | Yes                      |
+| `package-nuget.yml`          | Build, test, and publish NuGet packages                                                 | Yes                    | Yes                      |
+
+### GitHub to Azure federation
+
+Pipelines log in with OpenID Connect, so no secret is stored. Use one app registration per repository, named `github-<repo>`, and run `scripts/cd/New-Github-Azure-Federation.ps1` once per environment with the same `-PrincipalName`. Each run signs in to that environment's subscription, grants the app Contributor there, and appends a federated credential for that environment to the same app registration. Run it as an administrator, after `gh auth login` (the script looks up the numeric GitHub org and repo IDs).
+
+```powershell
+.\New-Github-Azure-Federation.ps1 -TenantId <tenant-guid> -SubscriptionId <platform-subscription-guid> `
+  -PrincipalName github-<repo> -Organization <org> -Repository <repo> -Environment platform
+
+.\New-Github-Azure-Federation.ps1 -TenantId <tenant-guid> -SubscriptionId <development-subscription-guid> `
+  -PrincipalName github-<repo> -Organization <org> -Repository <repo> -Environment development
+```
+
+| Repo | Run | `-Environment` | `-SubscriptionId` | `-PrincipalName` |
+| --- | --- | --- | --- | --- |
+| platform | 1 | `platform` | platform | `github-platform-azure` |
+| platform | 2 | `development` | development | `github-platform-azure` |
+| platform | 3 | `production` | production | `github-platform-azure` |
+| product | 1 | `development` | development | `github-<product>` |
+| product | 2 | `production` | production | `github-<product>` |
+
+- `-Environment` is the GitHub environment name and must exist in the repository. It accepts a list, but each run must use the subscription of its environments. Pipelines that set `environment:` present a subject for that environment, and the script adds one credential named `<PrincipalName>-env-<environment>` per environment. Rerunning is safe.
+- Use a different `-PrincipalName` for each repository. Two repositories sharing one app registration would share its credentials and roles.
+- The app registration is the same across environments, so `AZURE_CLIENT_ID` and `AZURE_TENANT_ID` are the same value everywhere. `AZURE_SUBSCRIPTION_ID` differs. Because the app has Contributor on every subscription you ran it for, a workflow that can log in as the app could target any of them. Protect `production` with required reviewers and restrict who can edit workflows, or use a separate app registration per environment if you need a hard boundary.
+- The script also adds `main` and `pull_request` credentials. Those do not go through environment protection, so remove them if every job sets `environment:`.
+- It prints `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID` and `AZURE_CLIENT_ID`. Save them as secrets on the matching GitHub environment, not on the repository.
 
 ### Scripts (`/scripts`)
 
@@ -53,13 +96,13 @@ Scripts are organized by function:
 5. **Push changes to trigger the workflows.**
 
 ### Example: Deploying a .NET Web API to Azure
-- Use `PRODUCT-api.yml` or `PRODUCT-api-sql.yml` for CI/CD.
+- Use `workload-digitalproduct-app.yml` and set `HAS_WEB`, `HAS_API` and `HAS_SQL` for the components you have.
 - Ensure your repo contains a `.sln` and project files in the expected structure.
 - Add secrets: `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`, and (for SQL) `SQL_ADMIN_USER`, `SQL_ADMIN_PASSWORD`.
 - The workflow will build, test, publish, and deploy your app to Azure App Service, and (if using SQL) run EF Core migrations.
 
 ### Example: Deploying Infrastructure with Bicep
-- Use `PRODUCT-iac.yml`.
+- Use `workload-digitalproduct-iac.yml` and set `MODE`.
 - Place your Bicep templates and parameter files in the `.azure/` directory.
 - Add Azure credentials as secrets.
 - The workflow will create/validate/deploy resource groups and Bicep templates.

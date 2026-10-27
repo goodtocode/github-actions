@@ -6,7 +6,7 @@
 #   3. Change directory to the script folder:
 #      CD C:\Scripts (wherever your script is)
 #   4. In powershell, run script: 
-#      .\New-Github-Azure-Federation.ps1  -TenantId 12343dac-0e69-436a-866b-456727dd3579 -SubscriptionId 12343dac-0e69-436a-866b-456727dd3579 -PrincipalName myco-github-devtest-100 -Organization mygithuborg -Repository mygithubrepo -Environment development
+#      .\New-Github-Azure-Federation.ps1  -TenantId 12343dac-0e69-436a-866b-456727dd3579 -SubscriptionId 12343dac-0e69-436a-866b-456727dd3579 -PrincipalName myco-github-development-100 -Organization mygithuborg -Repository mygithubrepo -Environment development,production
 ####################################################################################
 
 param (
@@ -21,7 +21,7 @@ param (
    [Parameter(Mandatory = $true, ValueFromPipelineByPropertyName = $true)]
    [string]$Repository = $(throw '-Repository is a required parameter.'), #GitHub Repository Name
    [Parameter(Mandatory = $true, ValueFromPipelineByPropertyName = $true)]
-   [string]$Environment = $(throw '-Environment is a required parameter.') #GitHub Repository Environment: development, production
+   [string[]]$Environment = $(throw '-Environment is a required parameter.') #GitHub Repository Environment(s): development, production
 )
 ####################################################################################
 Set-ExecutionPolicy Unrestricted -Scope Process -Force
@@ -111,15 +111,23 @@ Write-Host "Verified role assignment '$roleName' at '$roleScope'."
 $tenantId = (Get-AzContext).Subscription.TenantId
 
 # Create new App Registration Federated Credentials for the GitHub operations
-$subjectRepo = "repo:" + $Organization + "/" + $Repository + ":environment:" + $Environment
-$existingCredRepo = Get-AzADAppFederatedCredential -ApplicationObjectId $appObjectId -ErrorAction SilentlyContinue | Where-Object { $_.Name -eq "$PrincipalName-repo" }
-if (-not $existingCredRepo) {
-   New-AzADAppFederatedCredential -ApplicationObjectId $appObjectId -Audience api://AzureADTokenExchange -Issuer 'https://token.actions.githubusercontent.com' -Name "$PrincipalName-repo" -Subject "$subjectRepo"
+# GitHub's immutable subject format embeds numeric org/repo IDs; names are still needed to look them up (requires 'gh auth login').
+$orgId = gh api "orgs/$Organization" --jq .id
+$repoId = gh api "repos/$Organization/$Repository" --jq .id
+if (-not $orgId -or -not $repoId) { throw "Could not resolve GitHub org/repo IDs for $Organization/$Repository; run 'gh auth login' first." }
+$subjectPrefix = "repo:$Organization@$orgId/$Repository@$repoId"
+Write-Host "Subject prefix: $subjectPrefix"
+
+$existingCreds = @(Get-AzADAppFederatedCredential -ApplicationObjectId $appObjectId -ErrorAction SilentlyContinue)
+foreach ($envName in $Environment) {
+   $credName = "$PrincipalName-env-$envName"
+   if ($existingCreds | Where-Object { $_.Name -eq $credName }) {
+      Write-Host "Federated credential $credName already exists."
+      continue
+   }
+   New-AzADAppFederatedCredential -ApplicationObjectId $appObjectId -Audience api://AzureADTokenExchange -Issuer 'https://token.actions.githubusercontent.com' -Name $credName -Subject "${subjectPrefix}:environment:$envName"
 }
-else {
-   Write-Host "Federated credential $PrincipalName-repo already exists."
-}
-$subjectRepoMain = "repo:" + $Organization + "/" + $Repository + ":ref:refs/heads/main"
+$subjectRepoMain = "${subjectPrefix}:ref:refs/heads/main"
 $existingCredMain = Get-AzADAppFederatedCredential -ApplicationObjectId $appObjectId -ErrorAction SilentlyContinue | Where-Object { $_.Name -eq "$PrincipalName-main" }
 if (-not $existingCredMain) {
    New-AzADAppFederatedCredential -ApplicationObjectId $appObjectId -Audience api://AzureADTokenExchange -Issuer 'https://token.actions.githubusercontent.com' -Name "$PrincipalName-main" -Subject "$subjectRepoMain"
@@ -127,7 +135,7 @@ if (-not $existingCredMain) {
 else {
    Write-Host "Federated credential $PrincipalName-main already exists."
 }
-$subjectRepoPR = "repo:" + $Organization + "/" + $Repository + ":pull_request"
+$subjectRepoPR = "${subjectPrefix}:pull_request"
 $existingCredPR = Get-AzADAppFederatedCredential -ApplicationObjectId $appObjectId -ErrorAction SilentlyContinue | Where-Object { $_.Name -eq "$PrincipalName-PR" }
 if (-not $existingCredPR) {
    New-AzADAppFederatedCredential -ApplicationObjectId $appObjectId -Audience api://AzureADTokenExchange -Issuer 'https://token.actions.githubusercontent.com' -Name "$PrincipalName-PR" -Subject "$subjectRepoPR"

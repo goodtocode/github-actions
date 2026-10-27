@@ -1,0 +1,86 @@
+name: 'Platform Edge IaC'
+
+# Phase 2: Azure Front Door Premium in the platform subscription. No hub, spoke or VNet.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/platform-edge-iac.yml
+      - .azure/**/*.bicep
+      - .azure/**/*.bicepparam
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/platform-edge-iac.yml
+      - .azure/**/*.bicep
+      - .azure/**/*.bicepparam
+  workflow_dispatch:
+    inputs:
+      runcd:
+        description: "Run CD pipeline"
+        required: true
+        default: "false"
+
+env:
+  # ===== EDIT PER INSTALL: naming slots (RG: {product/purpose}-{env}-{region}-{instance}-rg) =====
+  PURPOSE: "edge"
+  REGION: "wus2"
+  INSTANCE: "001"
+  LOCATION: "westus2"
+  # ===============================================================================================
+  DOTNET_SYSTEM_GLOBALIZATION_INVARIANT: "true"
+  EDGE_BICEP_TEMPLATE: ".azure/templates/platform-shared-edge-frontdoor.bicep"
+  EDGE_BICEP_PARAMETERS: ".azure/variables/platform-shared-edge-frontdoor-plat.bicepparam"
+
+permissions:
+  id-token: write
+  contents: read
+  security-events: write
+
+jobs:
+  edge:
+    name: "Edge IaC (platform)"
+    runs-on: ubuntu-latest
+    environment: platform
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      # Hard-code the resource group name here if it does not follow the slot pattern.
+      - name: Resolve resource group name
+        shell: bash
+        run: echo "EDGE_RG_NAME=${PURPOSE}-plat-${REGION}-${INSTANCE}-rg" >> "$GITHUB_ENV"
+
+      - name: "Az CLI login"
+        uses: azure/login@v3
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Create ${{ env.EDGE_RG_NAME }}
+        uses: Azure/cli@v3
+        with:
+          inlineScript: |
+            az group create -n ${{ env.EDGE_RG_NAME }} -l ${{ env.LOCATION }}
+
+      - name: Validate ${{ env.EDGE_RG_NAME }}
+        uses: Azure/cli@v3
+        with:
+          inlineScript: |
+            az deployment group what-if --resource-group ${{ env.EDGE_RG_NAME }} --template-file ${{ env.EDGE_BICEP_TEMPLATE }} --parameters ${{ env.EDGE_BICEP_PARAMETERS }}
+
+      - name: Deploy ${{ env.EDGE_RG_NAME }}
+        if: |
+          (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+          (github.event_name == 'workflow_dispatch' && github.event.inputs.runcd == 'true')
+        uses: Azure/cli@v3
+        with:
+          inlineScript: |
+            az deployment group create --resource-group ${{ env.EDGE_RG_NAME }} --template-file ${{ env.EDGE_BICEP_TEMPLATE }} --parameters ${{ env.EDGE_BICEP_PARAMETERS }}

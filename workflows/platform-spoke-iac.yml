@@ -11,6 +11,7 @@ on:
     paths:
       - .github/workflows/platform-spoke-iac.yml
       - .azure/**/*.bicep
+      - .azure/**/*.bicepparam
       - .azure/**/*.bicepparams
   push:
     branches:
@@ -18,11 +19,17 @@ on:
     paths:
       - .github/workflows/platform-spoke-iac.yml
       - .azure/**/*.bicep
+      - .azure/**/*.bicepparam
       - .azure/**/*.bicepparams
   workflow_dispatch:
     inputs:
       environment:
         description: "Environment to run"
+        type: choice
+        options:
+          - development
+          - production
+          - all
         required: true
         default: "development"
       runcd:
@@ -31,30 +38,83 @@ on:
         default: "false"
 
 env:
-  DOTNET_SYSTEM_GLOBALIZATION_INVARIANT: "true"
-  HUB_MGMT_RG_NAME: "SCOPE-hub-mgmt-plat-wus2-001-rg"
+  # ===== EDIT PER INSTALL: naming slots =====
+  SCOPE: "SCOPE"        # tenant/org prefix, e.g. cen
+  REGION: "wus2"        # region short code in names
+  INSTANCE: "001"       # instance number in names
   SPOKE_LOCATION: "westus2"
-  SPOKE_NETWORK_RG_NAME: "SCOPE-spoke-network-dev-wus2-001-rg"
+  # ==========================================
+  DOTNET_SYSTEM_GLOBALIZATION_INVARIANT: "true"
   SPOKE_NETWORK_BICEP_TEMPLATE: ".azure/templates/platform-spoke-network-publicroute.bicep"
-  SPOKE_NETWORK_BICEP_PARAMETERS: ".azure/variables/platform-spoke-network-publicroute-dev.bicepparam" 
-  SPOKE_MGMT_RG_NAME: "SCOPE-spoke-mgmt-dev-wus2-001-rg"
-  SPOKE_MGMT_BICEP_TEMPLATE: ".azure/templates/platform-spoke-mgmt.bicep"
-  SPOKE_MGMT_BICEP_PARAMETERS: ".azure/variables/platform-spoke-mgmt-dev.bicepparam"
-  
+  SPOKE_MGMT_BICEP_TEMPLATE: ".azure/templates/platform-mgmt.bicep"
+
 permissions:
   id-token: write
   contents: read
   security-events: write
 
 jobs:
-  ci:
-    name: "Validate spoke IaC"
+  plan:
+    name: "Select environments"
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || github.event_name == 'push'
-    environment: development
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+      deploy: ${{ steps.plan.outputs.deploy }}
+    steps:
+      - name: Plan
+        id: plan
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_ENVIRONMENT: ${{ github.event.inputs.environment }}
+          INPUT_RUNCD: ${{ github.event.inputs.runcd }}
+        run: |
+          dev='{"environment":"development","short":"dev"}'
+          prod='{"environment":"production","short":"prod"}'
+          deploy=false
+          case "$EVENT_NAME" in
+            pull_request) list="$dev" ;;
+            push) list="$dev,$prod"; deploy=true ;;
+            *)
+              case "$INPUT_ENVIRONMENT" in
+                production) list="$prod" ;;
+                all) list="$dev,$prod" ;;
+                *) list="$dev" ;;
+              esac
+              [ "$INPUT_RUNCD" = "true" ] && deploy=true
+              ;;
+          esac
+          echo "matrix={\"include\":[$list]}" >> "$GITHUB_OUTPUT"
+          echo "deploy=$deploy" >> "$GITHUB_OUTPUT"
+
+  # Environments run in order (development, then production). Required reviewers on the
+  # GitHub 'production' environment provide the manual approval gate.
+  # Single-environment users: remove the unused entry from the plan step above.
+  spoke:
+    name: "Spoke IaC (${{ matrix.environment }})"
+    runs-on: ubuntu-latest
+    needs: plan
+    environment: ${{ matrix.environment }}
+    strategy:
+      fail-fast: true
+      max-parallel: 1
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    env:
+      SPOKE_NETWORK_BICEP_PARAMETERS: .azure/variables/platform-spoke-network-publicroute-${{ matrix.short }}.bicepparam
+      SPOKE_MGMT_BICEP_PARAMETERS: .azure/variables/platform-mgmt-${{ matrix.short }}.bicepparam
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+
+      # Hard-code any resource group name here if it does not follow the slot pattern.
+      - name: Resolve resource group names
+        shell: bash
+        run: |
+          {
+            echo "HUB_MGMT_RG_NAME=mgmt-plat-${REGION}-${INSTANCE}-rg"
+            echo "SPOKE_NETWORK_RG_NAME=network-${{ matrix.short }}-${REGION}-${INSTANCE}-rg"
+            echo "SPOKE_MGMT_RG_NAME=mgmt-${{ matrix.short }}-${REGION}-${INSTANCE}-rg"
+          } >> "$GITHUB_ENV"
 
       - name: "Az CLI login"
         uses: azure/login@v3
@@ -69,7 +129,7 @@ jobs:
           inlineScript: |
             az group create -n ${{ env.SPOKE_NETWORK_RG_NAME }} -l ${{ env.SPOKE_LOCATION }}
 
-          uses: Azure/cli@v3
+      - name: Validate ${{ env.SPOKE_NETWORK_RG_NAME }}
         uses: Azure/cli@v3
         with:
           inlineScript: |
@@ -87,44 +147,15 @@ jobs:
           inlineScript: |
             az deployment group what-if --resource-group ${{ env.SPOKE_MGMT_RG_NAME }} --template-file ${{ env.SPOKE_MGMT_BICEP_TEMPLATE }} --parameters ${{ env.SPOKE_MGMT_BICEP_PARAMETERS }} --parameters hubMgmtSubscriptionId=${{ secrets.PLATFORM_SUBSCRIPTION_ID }} hubMgmtResourceGroupName=${{ env.HUB_MGMT_RG_NAME }}
 
-  cd:
-    name: "Deploy landing zone IaC"
-    runs-on: ubuntu-latest
-    needs: ci
-    if: |
-        (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
-        (github.event_name == 'workflow_dispatch' && (github.event.inputs.runcd == 'true' || github.event.inputs.runcd == true) && github.event.inputs.environment == 'development')
-    environment: development
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      - name: "Az CLI login"
-        uses: azure/login@v3
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-      - name: Create ${{ env.SPOKE_NETWORK_RG_NAME }}
-        uses: Azure/cli@v3
-        with:
-          inlineScript: |
-            az group create -n ${{ env.SPOKE_NETWORK_RG_NAME }} -l ${{ env.SPOKE_LOCATION }}
-
       - name: Deploy ${{ env.SPOKE_NETWORK_RG_NAME }}
+        if: needs.plan.outputs.deploy == 'true'
         uses: Azure/cli@v3
         with:
           inlineScript: |
             az deployment group create --resource-group ${{ env.SPOKE_NETWORK_RG_NAME }} --template-file ${{ env.SPOKE_NETWORK_BICEP_TEMPLATE }} --parameters ${{ env.SPOKE_NETWORK_BICEP_PARAMETERS }}
 
-      - name: Create ${{ env.SPOKE_MGMT_RG_NAME }}
-        uses: Azure/cli@v3
-        with:
-          inlineScript: |
-            az group create -n ${{ env.SPOKE_MGMT_RG_NAME }} -l ${{ env.SPOKE_LOCATION }}
-
       - name: Deploy ${{ env.SPOKE_MGMT_RG_NAME }}
+        if: needs.plan.outputs.deploy == 'true'
         uses: Azure/cli@v3
         with:
           inlineScript: |

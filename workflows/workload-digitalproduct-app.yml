@@ -1,5 +1,8 @@
-name: 'Web & API & SQL CI/CD'
+name: 'Workload Digital Product App CI/CD'
 
+# One pipeline for web, API and SQL migrations. Turn components on or off with HAS_WEB, HAS_API and HAS_SQL.
+# CI builds and tests once; CD deploys development first, then production behind the
+# 'production' environment's required reviewers.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -9,18 +12,23 @@ on:
     branches:
       - main
     paths:
-      - .github/workflows/PRODUCT-web-api-sql.yml
+      - .github/workflows/workload-digitalproduct-app.yml
       - src/**
   push:
     branches:
       - main
     paths:
-      - .github/workflows/PRODUCT-web-api-sql.yml
+      - .github/workflows/workload-digitalproduct-app.yml
       - src/**
   workflow_dispatch:
     inputs:
       environment:
         description: "Environment to run"
+        type: choice
+        options:
+          - development
+          - production
+          - all
         required: true
         default: "development"
       runcd:
@@ -34,15 +42,17 @@ permissions:
   security-events: write
 
 env:
-  # Manual environment-specific values (update these first)
-  SPOKE_RG_NAME: 'SCOPE-spoke-mgmt-dev-wus2-001-rg'
-  APPI_NAME: 'spoke-mgmt-dev-wus2-001-appi'
-  AZURE_APIAPP_NAME: PRODUCT-dev-wus2-001-api
-  AZURE_WEBAPP_NAME: PRODUCT-dev-wus2-001-web
-  AZURE_RG_NAME: 'PRODUCT-dev-wus2-001-rg'
-  SQL_NAME: 'PRODUCT-dev-wus2-001-sql'
-  SQLDB_NAME: 'PRODUCT-dev-wus2-001-sqldb'
-
+  # ===== EDIT PER INSTALL: naming slots (names: {product/purpose}-{env}-{region}-{instance}-{abbreviation}) =====
+  PRODUCT: "PRODUCT"
+  REGION: "wus2"
+  INSTANCE: "001"
+  # Shared management RG and App Insights from platform-mgmt; purpose is normally 'mgmt'.
+  MGMT_PURPOSE: "mgmt"
+  # Components that exist in this repo.
+  HAS_WEB: "true"
+  HAS_API: "true"
+  HAS_SQL: "true"
+  # ==============================================================================================================
   API_ARTIFACT_OUTPUT: 'publish_output'
   WEB_ARTIFACT_OUTPUT: 'publish_web_output'
   API_ARTIFACT_NAME: 'api-artifact'
@@ -54,10 +64,8 @@ env:
 
 jobs:
   ci:
-    name: "Web, API and SQL CI"
+    name: "App CI"
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || github.event_name == 'push'
-    environment: development
     strategy:
       matrix:
         DOTNET_VERSION: ["10.x"]
@@ -117,14 +125,14 @@ jobs:
       - name: pipeline environment configuration
         run: |
           echo "ASPNETCORE_ENVIRONMENT=${{ env.RUNTIME_ENV }}" >> $GITHUB_ENV
-          echo "OpenAI:ApiKey=${{ secrets.OPENAI_APIKEY }}" >> $GITHUB_ENV
         shell: pwsh
 
       - name: App Settings Variable Substitution
+        if: env.HAS_API == 'true'
         uses: microsoft/variable-substitution@v1
         with:
           files: '${{ env.SRC_PATH }}/${{ env.API_PATH }}/appsettings.json, ${{ env.SRC_PATH }}/${{ env.API_PATH }}/appsettings.${{ env.RUNTIME_ENV }}.json, ${{ env.SRC_PATH }}/${{ env.TEST_PATH }}/appsettings.test.json'
-        env: 
+        env:
           OpenAI.ApiKey: ${{ secrets.OPENAI_APIKEY }}
 
       - name: Initialize CodeQL
@@ -137,19 +145,17 @@ jobs:
         shell: pwsh
 
       - name: Install dotnet-ef
+        if: env.HAS_SQL == 'true'
         run: |
           dotnet tool install --global dotnet-ef
-          echo Home: $env:HOME
-          echo "GITHUB_PATH=$env:HOME/.dotnet/tools" >> $GITHUB_ENV
+          echo "$env:HOME/.dotnet/tools" >> $env:GITHUB_PATH
         shell: pwsh
 
-      - name: Check for uncommitted EF Core model changes (diagnostic)
-        if: github.event_name == 'pull_request'
+      - name: Check for uncommitted EF Core model changes
+        if: env.HAS_SQL == 'true' && github.event_name == 'pull_request'
         run: |
-          Write-Host "Working Directory: $(Get-Location)"
           $tempDir = "${{ env.SRC_PATH }}/${{ env.INFRA_PATH }}/.temp-migrations"
           if (Test-Path $tempDir) { Remove-Item -Recurse -Force $tempDir }
-          Write-Host "Running command: dotnet ef migrations add TempCheck --project ${{ env.SRC_PATH }}/${{ env.INFRA_PATH }}/${{ env.INFRA_PROJECT }} --startup-project ${{ env.SRC_PATH }}/${{ env.API_PATH }}/${{ env.API_PROJECT }} --context ${{ env.INFRA_DBCONTEXT }} --output-dir $tempDir"
           dotnet ef migrations add TempCheck --project ${{ env.SRC_PATH }}/${{ env.INFRA_PATH }}/${{ env.INFRA_PROJECT }} --startup-project ${{ env.SRC_PATH }}/${{ env.API_PATH }}/${{ env.API_PROJECT }} --context ${{ env.INFRA_DBCONTEXT }} --output-dir $tempDir --configuration ${{ env.CONFIGURATION }} --no-build
           if ($LASTEXITCODE -ne 0) {
             Write-Host "::error::dotnet ef migrations add failed."
@@ -157,9 +163,8 @@ jobs:
           }
           if (Test-Path $tempDir) {
             $files = Get-ChildItem -Path $tempDir
-            $files | ForEach-Object { Write-Host $_.FullName }
             if ($files) {
-              Write-Host "::error::Uncommitted model changes detected! Please run 'dotnet ef migrations add' locally and commit the migration files."
+              Write-Host "::error::Uncommitted model changes detected. Run 'dotnet ef migrations add' locally and commit the migration files."
               Remove-Item -Recurse -Force $tempDir
               exit 1
             }
@@ -167,84 +172,147 @@ jobs:
           }
         shell: pwsh
 
-      - name: Create ${{ env.INFRA_DBCONTEXT }} SQL Script
+      - name: Create ${{ env.INFRA_DBCONTEXT }} SQL script
+        if: env.HAS_SQL == 'true'
         run: |
           dotnet ef migrations script --project ${{ env.SRC_PATH }}/${{ env.INFRA_PATH }}/${{ env.INFRA_PROJECT }} --startup-project ${{ env.SRC_PATH }}/${{ env.API_PATH }}/${{ env.API_PROJECT }} --context ${{ env.INFRA_DBCONTEXT }} --output ${{ env.MIGRATION_ARTIFACT_PATH }} --idempotent --configuration ${{ env.CONFIGURATION }} --no-build
         shell: pwsh
 
       - name: Upload migration script
+        if: env.HAS_SQL == 'true' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
         uses: actions/upload-artifact@v7
         with:
           name: ${{ env.MIGRATION_ARTIFACT_NAME }}
           path: ${{ env.MIGRATION_ARTIFACT_PATH }}
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
-        
+
       - name: Test
-        run: dotnet build ${{ env.SRC_SLN }} --configuration ${{ env.CONFIGURATION }} --no-build
+        run: dotnet test ${{ env.SRC_PATH }}/${{ env.TEST_PATH }}/${{ env.TEST_PROJECT }} --configuration ${{ env.CONFIGURATION }} --no-build --logger "trx;LogFileName=test-results.trx" --results-directory "${{ env.SRC_PATH }}/TestResults"
         shell: pwsh
+
+      - name: Upload test results
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: dotnet-results-${{ matrix.DOTNET_VERSION }}
+          path: ${{ env.SRC_PATH }}/TestResults
 
       - name: Pack Web API artifact
+        if: env.HAS_API == 'true'
         run: |
-          dotnet publish ${{ env.SRC_PATH }}/${{ env.API_PATH }}/${{ env.API_PROJECT }} --configuration ${{ env.CONFIGURATION }} --no-build --output publish_output
+          dotnet publish ${{ env.SRC_PATH }}/${{ env.API_PATH }}/${{ env.API_PROJECT }} --configuration ${{ env.CONFIGURATION }} --no-build --output ${{ env.API_ARTIFACT_OUTPUT }}
         shell: pwsh
 
-      - name: Upload Web API artifact      
+      - name: Upload Web API artifact
+        if: env.HAS_API == 'true' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
         uses: actions/upload-artifact@v7
         with:
           name: ${{ env.API_ARTIFACT_NAME }}
           path: ${{ env.API_ARTIFACT_OUTPUT }}/**
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
 
       - name: Pack Blazor artifact
+        if: env.HAS_WEB == 'true'
         run: |
-          dotnet publish ${{ env.SRC_PATH }}/${{ env.WEB_PATH }}/${{ env.WEB_PROJECT }} --configuration ${{ env.CONFIGURATION }} --no-build --output publish_web_output
+          dotnet publish ${{ env.SRC_PATH }}/${{ env.WEB_PATH }}/${{ env.WEB_PROJECT }} --configuration ${{ env.CONFIGURATION }} --no-build --output ${{ env.WEB_ARTIFACT_OUTPUT }}
         shell: pwsh
 
       - name: Upload Blazor artifact
+        if: env.HAS_WEB == 'true' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
         uses: actions/upload-artifact@v7
         with:
           name: ${{ env.WEB_ARTIFACT_NAME }}
           path: ${{ env.WEB_ARTIFACT_OUTPUT }}/**
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v4
         if: ${{ env.CODEQL_ON_PRIVATE == 'true' || !github.event.repository.private }}
 
-  cd:
-    name: "Web, API and SQL CD"
+  plan:
+    name: "Select environments"
     runs-on: ubuntu-latest
-    needs: ci
-    if: |
-        (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
-        (github.event_name == 'workflow_dispatch' && (github.event.inputs.runcd == 'true' || github.event.inputs.runcd == true) && github.event.inputs.environment == 'development')
-    environment: development
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+      deploy: ${{ steps.plan.outputs.deploy }}
+    steps:
+      - name: Plan
+        id: plan
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF: ${{ github.ref }}
+          INPUT_ENVIRONMENT: ${{ github.event.inputs.environment }}
+          INPUT_RUNCD: ${{ github.event.inputs.runcd }}
+        run: |
+          dev='{"environment":"development","rgenv":"dev","runtime":"Development"}'
+          prod='{"environment":"production","rgenv":"prod","runtime":"Production"}'
+          deploy=false
+          case "$EVENT_NAME" in
+            pull_request) list="$dev" ;;
+            push)
+              list="$dev,$prod"
+              [ "$REF" = "refs/heads/main" ] && deploy=true
+              ;;
+            *)
+              case "$INPUT_ENVIRONMENT" in
+                production) list="$prod" ;;
+                all) list="$dev,$prod" ;;
+                *) list="$dev" ;;
+              esac
+              [ "$INPUT_RUNCD" = "true" ] && deploy=true
+              ;;
+          esac
+          echo "matrix={\"include\":[$list]}" >> "$GITHUB_OUTPUT"
+          echo "deploy=$deploy" >> "$GITHUB_OUTPUT"
+
+  # Single-environment users: remove the unused entry from the plan step above.
+  cd:
+    name: "App CD (${{ matrix.environment }})"
+    runs-on: ubuntu-latest
+    needs: [ci, plan]
+    if: needs.plan.outputs.deploy == 'true'
+    environment: ${{ matrix.environment }}
     strategy:
-      matrix:
-        DOTNET_VERSION: ["10.x"]
+      fail-fast: true
+      max-parallel: 1
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
     env:
-      AZURE_WEBAPP_PACKAGE_PATH: '.'
-      RUNTIME_ENV: "Development"
+      RUNTIME_ENV: ${{ matrix.runtime }}
 
     steps:
+      # Hard-code any name here if it does not follow the slot pattern.
+      - name: Resolve names
+        shell: bash
+        run: |
+          prefix="${PRODUCT}-${{ matrix.rgenv }}-${REGION}-${INSTANCE}"
+          {
+            echo "MGMT_RG_NAME=${MGMT_PURPOSE}-${{ matrix.rgenv }}-${REGION}-${INSTANCE}-rg"
+            echo "APPI_NAME=${MGMT_PURPOSE}-${{ matrix.rgenv }}-${REGION}-${INSTANCE}-appi"
+            echo "AZURE_RG_NAME=${prefix}-rg"
+            echo "AZURE_APIAPP_NAME=${prefix}-api"
+            echo "AZURE_WEBAPP_NAME=${prefix}-web"
+            echo "SQL_NAME=${prefix}-sql"
+            echo "SQLDB_NAME=${prefix}-sqldb"
+          } >> "$GITHUB_ENV"
+
       - name: Download Web API artifact
+        if: env.HAS_API == 'true'
         uses: actions/download-artifact@v8
         with:
           name: ${{ env.API_ARTIFACT_NAME }}
           path: ${{ env.API_ARTIFACT_OUTPUT }}
 
-      - name: Download Web Artifact
+      - name: Download Web artifact
+        if: env.HAS_WEB == 'true'
         uses: actions/download-artifact@v8
         with:
           name: ${{ env.WEB_ARTIFACT_NAME }}
           path: ${{ env.WEB_ARTIFACT_OUTPUT }}
 
       - name: Download migration script
+        if: env.HAS_SQL == 'true'
         uses: actions/download-artifact@v8
         with:
           name: ${{ env.MIGRATION_ARTIFACT_NAME }}
           path: ${{ env.MIGRATION_ARTIFACT_OUTPUT_PATH }}
-
 
       - name: az login
         uses: azure/login@v3
@@ -254,55 +322,63 @@ jobs:
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: Get SQL connection string
+        if: env.HAS_SQL == 'true'
         id: get_sql_conn
         run: |
           $TEMP_STR=az sql db show-connection-string --client ado.net --server ${{ env.SQL_NAME }} --name ${{ env.SQLDB_NAME }} -o tsv
           $TEMP_STR=$TEMP_STR.replace("<username>", "${{ secrets.SQL_ADMIN_USER }}")
           $TEMP_STR=$TEMP_STR.replace("<password>", "${{ secrets.SQL_ADMIN_PASSWORD }}")
+          echo "::add-mask::$TEMP_STR"
           echo "CONN_STR=$TEMP_STR" >> $env:GITHUB_OUTPUT
         shell: pwsh
 
       - name: Deploy SQL script
+        if: env.HAS_SQL == 'true'
         uses: azure/sql-action@v2.4
         with:
           connection-string: ${{ steps.get_sql_conn.outputs.CONN_STR }}
           path: ${{ env.MIGRATION_ARTIFACT_PATH }}
 
-      - name: Deploy Web API to Azure App Service
-          uses: azure/webapps-deploy@v3
+      - name: Deploy ${{ env.AZURE_APIAPP_NAME }}
+        if: env.HAS_API == 'true'
+        uses: azure/webapps-deploy@v3
         with:
           app-name: ${{ env.AZURE_APIAPP_NAME }}
           package: ${{ env.API_ARTIFACT_OUTPUT }}
 
       - name: ${{ env.AZURE_APIAPP_NAME }} app settings
+        if: env.HAS_API == 'true'
         run: |
           az config set extension.use_dynamic_install=yes_without_prompt
-          $TEMP_JSON = az monitor app-insights component show -g ${{ env.SPOKE_RG_NAME }} --app ${{ env.APPI_NAME }} | ConvertFrom-Json
+          $TEMP_JSON = az monitor app-insights component show -g ${{ env.MGMT_RG_NAME }} --app ${{ env.APPI_NAME }} | ConvertFrom-Json
           $INSTR_KEY = $TEMP_JSON.instrumentationKey
           $CONN_STR = $TEMP_JSON.connectionString
           az webapp config appsettings set -g ${{ env.AZURE_RG_NAME }} -n ${{ env.AZURE_APIAPP_NAME }} --settings APPINSIGHTS_INSTRUMENTATIONKEY=$INSTR_KEY
           az webapp config appsettings set -g ${{ env.AZURE_RG_NAME }} -n ${{ env.AZURE_APIAPP_NAME }} --settings APPLICATIONINSIGHTS_CONNECTION_STRING=$CONN_STR
-          az webapp config appsettings set -g ${{ env.AZURE_RG_NAME }} -n ${{ env.AZURE_APIAPP_NAME }} --settings ASPNETCORE_ENVIRONMENT=${{ env.RUNTIME_ENV }}          
+          az webapp config appsettings set -g ${{ env.AZURE_RG_NAME }} -n ${{ env.AZURE_APIAPP_NAME }} --settings ASPNETCORE_ENVIRONMENT=${{ env.RUNTIME_ENV }}
           az webapp config appsettings set -g ${{ env.AZURE_RG_NAME }} -n ${{ env.AZURE_APIAPP_NAME }} --settings EntraExternalId:TenantId=${{ secrets.EEID_TENANT_ID }}
           az webapp config appsettings set -g ${{ env.AZURE_RG_NAME }} -n ${{ env.AZURE_APIAPP_NAME }} --settings EntraExternalId:ClientId=${{ secrets.API_CLIENT_ID }}
           az webapp config appsettings set -g ${{ env.AZURE_RG_NAME }} -n ${{ env.AZURE_APIAPP_NAME }} --settings OpenAI:ApiKey=${{ secrets.OPENAI_APIKEY }}
         shell: pwsh
 
       - name: ${{ env.AZURE_APIAPP_NAME }} connection strings
+        if: env.HAS_API == 'true' && env.HAS_SQL == 'true'
         run: |
           az webapp config connection-string set -g ${{ env.AZURE_RG_NAME }} -n ${{ env.AZURE_APIAPP_NAME }} -t SQLServer --settings DefaultConnection="${{ steps.get_sql_conn.outputs.CONN_STR }}"
         shell: pwsh
 
       - name: Deploy ${{ env.AZURE_WEBAPP_NAME }}
+        if: env.HAS_WEB == 'true'
         uses: azure/webapps-deploy@v3
         with:
           app-name: ${{ env.AZURE_WEBAPP_NAME }}
           package: ${{ env.WEB_ARTIFACT_OUTPUT }}
 
       - name: ${{ env.AZURE_WEBAPP_NAME }} app settings
+        if: env.HAS_WEB == 'true'
         run: |
           az config set extension.use_dynamic_install=yes_without_prompt
-          $TEMP_JSON = az monitor app-insights component show -g ${{ env.SPOKE_RG_NAME }} --app ${{ env.APPI_NAME }} | ConvertFrom-Json
+          $TEMP_JSON = az monitor app-insights component show -g ${{ env.MGMT_RG_NAME }} --app ${{ env.APPI_NAME }} | ConvertFrom-Json
           $INSTR_KEY = $TEMP_JSON.instrumentationKey
           $CONN_STR = $TEMP_JSON.connectionString
           az webapp config appsettings set -g ${{ env.AZURE_RG_NAME }} -n ${{ env.AZURE_WEBAPP_NAME }} --settings APPINSIGHTS_INSTRUMENTATIONKEY=$INSTR_KEY
@@ -314,9 +390,3 @@ jobs:
           az webapp config appsettings set -g ${{ env.AZURE_RG_NAME }} -n ${{ env.AZURE_WEBAPP_NAME }} --settings BackendApi:BaseUrl="https://${{ env.AZURE_APIAPP_NAME }}.azurewebsites.net"
           az webapp config appsettings set -g ${{ env.AZURE_RG_NAME }} -n ${{ env.AZURE_WEBAPP_NAME }} --settings BackendApi:ClientId=${{ secrets.API_CLIENT_ID }}
         shell: pwsh
-
-      - name: Swap to production slot
-        run: |
-          az webapp deployment slot swap --resource-group ${{ env.AZURE_RG_NAME }} --name ${{ env.AZURE_APIAPP_NAME }} --slot staging --target-slot production
-          echo "Swap finished. App Service Application URL: https://$(az webapp show --resource-group ${{ env.AZURE_RG_NAME }} --name ${{ env.AZURE_APIAPP_NAME }} --query hostNames[0] -o tsv)"
-        if: ${{ false }}
