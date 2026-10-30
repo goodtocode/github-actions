@@ -11,14 +11,14 @@ on:
     branches:
       - main
     paths:
-      - .github/workflows/platform-mgmt-iac.yml
+      - .github/workflows/platform-shared-mgmt-iac.yml
       - .azure/**/*.bicep
       - .azure/**/*.bicepparam
   push:
     branches:
       - main
     paths:
-      - .github/workflows/platform-mgmt-iac.yml
+      - .github/workflows/platform-shared-mgmt-iac.yml
       - .azure/**/*.bicep
       - .azure/**/*.bicepparam
   workflow_dispatch:
@@ -45,7 +45,7 @@ env:
   LOCATION: "westus2"
   # ===============================================================================================
   DOTNET_SYSTEM_GLOBALIZATION_INVARIANT: "true"
-  MGMT_BICEP_TEMPLATE: ".azure/templates/platform-mgmt.bicep"
+  MGMT_BICEP_TEMPLATE: ".azure/templates/platform-shared-mgmt.bicep"
 
 permissions:
   id-token: write
@@ -98,7 +98,7 @@ jobs:
       max-parallel: 1
       matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
     env:
-      MGMT_BICEP_PARAMETERS: .azure/variables/platform-mgmt-${{ matrix.short }}.bicepparam
+      MGMT_BICEP_PARAMETERS: .azure/variables/platform-shared-mgmt-${{ matrix.short }}.bicepparam
     steps:
       - name: Checkout
         uses: actions/checkout@v7

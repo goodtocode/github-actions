@@ -21,9 +21,9 @@ Workflows are named after the `.azure` templates they deploy: `{platform|workloa
 |------|---------|
 | `workload-digitalproduct-iac.yml` | Deploy a digital product (any mode: standalone, shared, network, zerotrust), development then production |
 | `workload-digitalproduct-app.yml` | Build, test and deploy web, API and SQL migrations; components switched by `HAS_WEB`, `HAS_API`, `HAS_SQL` |
-| `platform-edge-iac.yml` | Phase 2 platform edge (Front Door) in the platform subscription |
-| `platform-mgmt-iac.yml` | Phase 2 shared management, development then production |
-| `platform-ai-iac.yml` | Azure AI (Foundry or Ollama) in the product's resource group; `AI_VARIANT` picks the template |
+| `platform-shared-edge-iac.yml` | Phase 2 platform edge (Front Door) in the platform subscription |
+| `platform-shared-mgmt-iac.yml` | Phase 2 shared management, development then production |
+| `platform-shared-ai-iac.yml` | Azure AI (Foundry or Ollama) in the product's resource group; `AI_VARIANT` picks the template |
 | `platform-hub-iac.yml`, `platform-spoke-iac.yml` | Phase 3 and 4 hub and spoke network |
 | `package-nuget.yml` | Build, test, and publish NuGet packages |
 
@@ -36,7 +36,7 @@ Each phase adds to the previous one. Pick the phase that fits and copy only its 
 | Phase | Subscriptions | Pipelines | GitHub environments |
 | --- | --- | --- | --- |
 | 1. Cloud native startup | 1 | `workload-digitalproduct-iac.yml` (`MODE: standalone`), `workload-digitalproduct-app.yml` | `development` |
-| 2. Subscription segmentation | platform, development, production | `platform-edge-iac.yml`, `platform-mgmt-iac.yml`, `workload-digitalproduct-iac.yml` (`MODE: shared`), `workload-digitalproduct-app.yml`, optional `platform-ai-iac.yml` | `platform`, `development`, `production` |
+| 2. Subscription segmentation | platform, development, production | `platform-shared-edge-iac.yml`, `platform-shared-mgmt-iac.yml`, `workload-digitalproduct-iac.yml` (`MODE: shared`), `workload-digitalproduct-app.yml`, optional `platform-shared-ai-iac.yml` | `platform`, `development`, `production` |
 | 3. Enterprise network foundation | same | Phase 2 plus `platform-hub-iac.yml`, `platform-spoke-iac.yml` | same |
 | 4. Zero trust private services | same | Phase 3 with the zero-trust templates | same |
 

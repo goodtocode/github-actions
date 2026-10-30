@@ -46,7 +46,7 @@ env:
   PRODUCT: "PRODUCT"
   REGION: "wus2"
   INSTANCE: "001"
-  # Shared management RG and App Insights from platform-mgmt; purpose is normally 'mgmt'.
+  # Shared management RG and App Insights from platform-shared-mgmt; purpose is normally 'mgmt'.
   MGMT_PURPOSE: "mgmt"
   # Components that exist in this repo.
   HAS_WEB: "true"

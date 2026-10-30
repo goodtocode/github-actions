@@ -10,14 +10,14 @@ on:
     branches:
       - main
     paths:
-      - .github/workflows/platform-edge-iac.yml
+      - .github/workflows/platform-shared-edge-iac.yml
       - .azure/**/*.bicep
       - .azure/**/*.bicepparam
   push:
     branches:
       - main
     paths:
-      - .github/workflows/platform-edge-iac.yml
+      - .github/workflows/platform-shared-edge-iac.yml
       - .azure/**/*.bicep
       - .azure/**/*.bicepparam
   workflow_dispatch:

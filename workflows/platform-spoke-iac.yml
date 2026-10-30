@@ -46,7 +46,7 @@ env:
   # ==========================================
   DOTNET_SYSTEM_GLOBALIZATION_INVARIANT: "true"
   SPOKE_NETWORK_BICEP_TEMPLATE: ".azure/templates/platform-spoke-network-publicroute.bicep"
-  SPOKE_MGMT_BICEP_TEMPLATE: ".azure/templates/platform-mgmt.bicep"
+  SPOKE_MGMT_BICEP_TEMPLATE: ".azure/templates/platform-shared-mgmt.bicep"
 
 permissions:
   id-token: write
@@ -101,7 +101,7 @@ jobs:
       matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
     env:
       SPOKE_NETWORK_BICEP_PARAMETERS: .azure/variables/platform-spoke-network-publicroute-${{ matrix.short }}.bicepparam
-      SPOKE_MGMT_BICEP_PARAMETERS: .azure/variables/platform-mgmt-${{ matrix.short }}.bicepparam
+      SPOKE_MGMT_BICEP_PARAMETERS: .azure/variables/platform-shared-mgmt-${{ matrix.short }}.bicepparam
     steps:
       - name: Checkout
         uses: actions/checkout@v7
