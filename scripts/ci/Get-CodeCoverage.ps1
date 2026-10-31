@@ -1,12 +1,23 @@
-####################################################################################
-# Native .NET code coverage summary (plain stats)
-#
-# Usage:
-#   .\.github\scripts\ci\Get-CodeCoverage.ps1
-#   .\.github\scripts\ci\Get-CodeCoverage.ps1 -TestRootPath .\src
-#   .\.github\scripts\ci\Get-CodeCoverage.ps1 -IncludeTests
-#   .\.github\scripts\ci\Get-CodeCoverage.ps1 -TestProjectFilter "*Tests.Integration.csproj" -Configuration Debug
-####################################################################################
+<#
+.SYNOPSIS
+Native .NET code coverage summary (plain stats).
+
+.EXAMPLE
+# Default:
+.\.github\scripts\ci\Get-CodeCoverage.ps1
+
+.EXAMPLE
+# Custom test root path:
+.\.github\scripts\ci\Get-CodeCoverage.ps1 -TestRootPath .\src
+
+.EXAMPLE
+# Include test projects:
+.\.github\scripts\ci\Get-CodeCoverage.ps1 -IncludeTests
+
+.EXAMPLE
+# Filter test projects and set the configuration:
+.\.github\scripts\ci\Get-CodeCoverage.ps1 -TestProjectFilter "*Tests.Integration.csproj" -Configuration Debug
+#>
 
 Param(
     [string]$TestRootPath = (Join-Path $PSScriptRoot '..\..\..\src'),

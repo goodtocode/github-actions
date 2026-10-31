@@ -1,13 +1,15 @@
-####################################################################################
-# To execute
-#   1. Run Powershell as ADMINistrator
-#   2. In powershell, set security polilcy for this script: 
-#      Set-ExecutionPolicy Unrestricted -Scope Process -Force
-#   3. Change directory to the script folder:
-#      CD C:\Scripts (wherever your script is)
-#   4. In powershell, run script: 
-#      .\New-Github-Azure-Federation.ps1  -TenantId 12343dac-0e69-436a-866b-456727dd3579 -SubscriptionId 12343dac-0e69-436a-866b-456727dd3579 -PrincipalName myco-github-development-100 -Organization mygithuborg -Repository mygithubrepo -Environment development,production
-####################################################################################
+<#
+.SYNOPSIS
+Creates a federated identity so GitHub Actions can sign in to Azure.
+
+.DESCRIPTION
+Run PowerShell as ADMINistrator.
+If script execution is blocked, set the policy for this process first: Set-ExecutionPolicy Unrestricted -Scope Process -Force. Then change to the script folder and run the example below.
+
+.EXAMPLE
+# From the script folder:
+.\New-Github-Azure-Federation.ps1  -TenantId 12343dac-0e69-436a-866b-456727dd3579 -SubscriptionId 12343dac-0e69-436a-866b-456727dd3579 -PrincipalName myco-github-development-100 -Organization mygithuborg -Repository mygithubrepo -Environment development,production
+#>
 
 param (
    [Parameter(Mandatory = $true, ValueFromPipelineByPropertyName = $true)]

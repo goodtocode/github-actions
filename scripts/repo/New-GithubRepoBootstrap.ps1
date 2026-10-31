@@ -1,18 +1,18 @@
-# ================================
-# GitHub repo bootstrap (PowerShell)
-# Creates repo, enables security, branch policy, environments
-# Requires: GitHub CLI (gh) + authenticated session
-# ================================
-#
-# Pre-requisites (auto-executed):
-# - Installs GitHub CLI if not present
-# - Prompts for GitHub authentication if not already authenticated
-#
-# Example usage (copy/paste):
-#
-#   .\New-GithubRepoBootstrap.ps1 -Owner goodtocode -Repo my-repo -Visibility private
-#   .\New-GithubRepoBootstrap.ps1 -Owner goodtocode -Repo my-oss-repo -Oss
-#
+<#
+.SYNOPSIS
+Creates a GitHub repo and enables security, branch policy and environments.
+
+.DESCRIPTION
+Requires GitHub CLI (gh) and an authenticated session. Installs GitHub CLI if it is not present and prompts for GitHub authentication if not already authenticated.
+
+.EXAMPLE
+# Single line, safe to paste:
+.\New-GithubRepoBootstrap.ps1 -Owner goodtocode -Repo my-repo -Visibility private
+
+.EXAMPLE
+# Single line, safe to paste:
+.\New-GithubRepoBootstrap.ps1 -Owner goodtocode -Repo my-oss-repo -Oss
+#>
 param(
   [Parameter(Mandatory = $true)][string]$Owner,
   [Parameter(Mandatory = $true)][string]$Repo,

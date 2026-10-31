@@ -1,8 +1,14 @@
-#-----------------------------------------------------------------------
-# Set-Version [-Path [<String>]] [-VersionToReplace [<String>]]  [-Type [<String>]] 
-#
-# Example: .\Set-Version -Path \\source\path -Major 1
-#-----------------------------------------------------------------------
+<#
+.SYNOPSIS
+Writes a calculated version into the files under a path.
+
+.DESCRIPTION
+Syntax: Set-Version [-Path [<String>]] [-VersionToReplace [<String>]]  [-Type [<String>]]
+
+.EXAMPLE
+# Set the major version for the files under a path:
+.\Set-Version -Path \\source\path -Major 1
+#>
 
 # ***
 # *** Parameters

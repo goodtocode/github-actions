@@ -1,22 +1,30 @@
-#-----------------------------------------------------------------------
-# Get-Version [-VersionToReplace <String>] [-Major <String>] [-Minor <String>] [-Revision <String>] [-Build <String>] [-Patch <String>] [-PreRelease <String>] [-CommitHash <String>]
-#
-# 1. Default (auto date/time for revision/build/patch):
-#    .\Get-Version.ps1
-#    # Defaults: Major=1, Minor=0, Revision=(day of year), Build=(hour+minute), Patch=(month)
-#
-# 2. Set explicit major/minor (auto rest):
-#    .\Get-Version.ps1 -Major 2 -Minor 5
-#    # Defaults: Revision=(day of year), Build=(hour+minute), Patch=(month)
-#
-# 3. Full explicit version (no auto):
-#    .\Get-Version.ps1 -Major 1 -Minor 2 -Revision 3 -Build 4 -Patch 5
-#    # No defaults: all values are explicit
-#
-# 4. Pre-release and commit hash:
-#    .\Get-Version.ps1 -Major 1 -Minor 0 -Patch 1 -PreRelease -beta -CommitHash +abc123
-#    # Defaults: Revision=(day of year), Build=(hour+minute)
-#-----------------------------------------------------------------------
+<#
+.SYNOPSIS
+Builds a version string from date/time defaults or explicit version parts.
+
+.DESCRIPTION
+Syntax: Get-Version [-VersionToReplace <String>] [-Major <String>] [-Minor <String>] [-Revision <String>] [-Build <String>] [-Patch <String>] [-PreRelease <String>] [-CommitHash <String>]
+
+.EXAMPLE
+# Default (auto date/time for revision/build/patch):
+# Defaults: Major=1, Minor=0, Revision=(day of year), Build=(hour+minute), Patch=(month)
+.\Get-Version.ps1
+
+.EXAMPLE
+# Set explicit major/minor (auto rest):
+# Defaults: Revision=(day of year), Build=(hour+minute), Patch=(month)
+.\Get-Version.ps1 -Major 2 -Minor 5
+
+.EXAMPLE
+# Full explicit version (no auto):
+# No defaults: all values are explicit
+.\Get-Version.ps1 -Major 1 -Minor 2 -Revision 3 -Build 4 -Patch 5
+
+.EXAMPLE
+# Pre-release and commit hash:
+# Defaults: Revision=(day of year), Build=(hour+minute)
+.\Get-Version.ps1 -Major 1 -Minor 0 -Patch 1 -PreRelease -beta -CommitHash +abc123
+#>
 
 # ***
 # *** Parameters
