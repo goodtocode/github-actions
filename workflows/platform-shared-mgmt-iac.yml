@@ -38,8 +38,8 @@ on:
         default: "false"
 
 env:
-  # ===== EDIT PER INSTALL: naming slots (RG: {product/purpose}-{env}-{region}-{instance}-rg) =====
-  PURPOSE: "mgmt"
+  # ===== EDIT PER INSTALL: naming slots (RG: {product}-{env}-{region}-{instance}-rg) =====
+  PRODUCT: "mgmt"
   REGION: "wus2"
   INSTANCE: "001"
   LOCATION: "westus2"
@@ -106,7 +106,7 @@ jobs:
       # Hard-code the resource group name here if it does not follow the slot pattern.
       - name: Resolve resource group name
         shell: bash
-        run: echo "MGMT_RG_NAME=${PURPOSE}-${{ matrix.rgenv }}-${REGION}-${INSTANCE}-rg" >> "$GITHUB_ENV"
+        run: echo "MGMT_RG_NAME=${PRODUCT}-${{ matrix.rgenv }}-${REGION}-${INSTANCE}-rg" >> "$GITHUB_ENV"
 
       - name: "Az CLI login"
         uses: azure/login@v3

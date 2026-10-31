@@ -11,14 +11,14 @@ on:
     paths:
       - .github/workflows/platform-hub-iac.yml
       - .azure/**/*.bicep
-      - .azure/**/*.bicepparams
+      - .azure/**/*.bicepparam
   push:
     branches:
       - main
     paths:
       - .github/workflows/platform-hub-iac.yml
       - .azure/**/*.bicep
-      - .azure/**/*.bicepparams
+      - .azure/**/*.bicepparam
   workflow_dispatch:
     inputs:
       environment:

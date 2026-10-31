@@ -38,7 +38,7 @@ on:
         default: "false"
 
 env:
-  # ===== EDIT PER INSTALL: naming slots (RG: {product/purpose}-{env}-{region}-{instance}-rg) =====
+  # ===== EDIT PER INSTALL: naming slots (RG: {product}-{env}-{region}-{instance}-rg) =====
   PRODUCT: "PRODUCT"
   REGION: "wus2"
   INSTANCE: "001"

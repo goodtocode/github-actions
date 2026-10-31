@@ -31,7 +31,7 @@ Consumer repos rename `workload-digitalproduct-*` to the product name, for examp
 
 ### Maturity roadmap pipelines
 
-Each phase adds to the previous one. Pick the phase that fits and copy only its pipelines. Resource groups follow `{product/purpose}-{env}-{region}-{instance}-rg`, set in the naming slots at the top of each workflow.
+Each phase adds to the previous one. Pick the phase that fits and copy only its pipelines. Resource groups follow `{product}-{env}-{region}-{instance}-rg`, set in the naming slots at the top of each workflow.
 
 | Phase | Subscriptions | Pipelines | GitHub environments |
 | --- | --- | --- | --- |

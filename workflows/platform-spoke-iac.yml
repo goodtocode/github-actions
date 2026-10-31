@@ -12,7 +12,6 @@ on:
       - .github/workflows/platform-spoke-iac.yml
       - .azure/**/*.bicep
       - .azure/**/*.bicepparam
-      - .azure/**/*.bicepparams
   push:
     branches:
       - main
@@ -20,7 +19,6 @@ on:
       - .github/workflows/platform-spoke-iac.yml
       - .azure/**/*.bicep
       - .azure/**/*.bicepparam
-      - .azure/**/*.bicepparams
   workflow_dispatch:
     inputs:
       environment:

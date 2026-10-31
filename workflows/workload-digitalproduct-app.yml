@@ -42,12 +42,12 @@ permissions:
   security-events: write
 
 env:
-  # ===== EDIT PER INSTALL: naming slots (names: {product/purpose}-{env}-{region}-{instance}-{abbreviation}) =====
+  # ===== EDIT PER INSTALL: naming slots (names: {product}-{env}-{region}-{instance}-{type}) =====
   PRODUCT: "PRODUCT"
   REGION: "wus2"
   INSTANCE: "001"
-  # Shared management RG and App Insights from platform-shared-mgmt; purpose is normally 'mgmt'.
-  MGMT_PURPOSE: "mgmt"
+  # Shared management RG and App Insights from platform-shared-mgmt; product is normally 'mgmt'.
+  MGMT_PRODUCT: "mgmt"
   # Components that exist in this repo.
   HAS_WEB: "true"
   HAS_API: "true"
@@ -284,8 +284,8 @@ jobs:
         run: |
           prefix="${PRODUCT}-${{ matrix.rgenv }}-${REGION}-${INSTANCE}"
           {
-            echo "MGMT_RG_NAME=${MGMT_PURPOSE}-${{ matrix.rgenv }}-${REGION}-${INSTANCE}-rg"
-            echo "APPI_NAME=${MGMT_PURPOSE}-${{ matrix.rgenv }}-${REGION}-${INSTANCE}-appi"
+            echo "MGMT_RG_NAME=${MGMT_PRODUCT}-${{ matrix.rgenv }}-${REGION}-${INSTANCE}-rg"
+            echo "APPI_NAME=${MGMT_PRODUCT}-${{ matrix.rgenv }}-${REGION}-${INSTANCE}-appi"
             echo "AZURE_RG_NAME=${prefix}-rg"
             echo "AZURE_APIAPP_NAME=${prefix}-api"
             echo "AZURE_WEBAPP_NAME=${prefix}-web"
