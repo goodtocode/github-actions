@@ -123,13 +123,14 @@ Follow these steps to configure your environment for GitHub Actions CI/CD and Az
 Use the provided PowerShell script to create both the Web and API app registrations in your Entra External ID (EEID) tenant. Replace the placeholders with your actual values:
 
 ```powershell
-pwsh -File ./.azure/scripts/entra/New-EntraAppRegistrations.ps1 \
+pwsh -File ./.azure/scripts/entra/New-EntraSolution.ps1 \
 	-EntraInstanceUrl "https://<your-tenant-name>.ciamlogin.com" \
 	-TenantId "<your-tenant-id>" \
 	-WebAppRegistrationName "<web-app-registration-name>" \
 	-ApiAppRegistrationName "<api-app-registration-name>" \
 	-WebProjectPath "./src/Presentation.Blazor" \
-	-ApiProjectPath "./src/Presentation.WebApi"
+	-ApiProjectPath "./src/Presentation.WebApi" \
+	-GenerateSecrets
 ```
 
 This script will output the required IDs and URIs for your environment.
