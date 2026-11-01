@@ -37,7 +37,8 @@ Set-ExecutionPolicy Unrestricted -Scope Process -Force
 $VerbosePreference = 'SilentlyContinue' # 'SilentlyContinue' # 'Continue'
 [String]$ThisScript = $MyInvocation.MyCommand.Path
 [String]$ThisDir = Split-Path $ThisScript
-Set-Location $ThisDir # Ensure our location is correct, so we can use relative paths
+Push-Location $ThisDir # Ensure our location is correct, so we can use relative paths; restored on exit
+trap { Pop-Location -ErrorAction SilentlyContinue; break }
 Write-Host "*****************************"
 Write-Host "*** Starting: $ThisScript On: $(Get-Date)"
 Write-Host "*****************************"
@@ -163,3 +164,4 @@ Set-FederatedCredential -Name "$PrincipalName-PR" -Subject "${subjectPrefix}:pul
 Write-Host "AZURE_TENANT_ID: $tenantId"
 Write-Host "AZURE_SUBSCRIPTION_ID: $SubscriptionId"
 Write-Host "AZURE_CLIENT_ID: $clientId"
+Pop-Location
