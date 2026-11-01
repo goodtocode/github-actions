@@ -128,16 +128,15 @@ Write-Host "Verified role assignment '$roleName' at '$roleScope'."
 $tenantId = (Get-AzContext).Subscription.TenantId
 
 # Create new App Registration Federated Credentials for the GitHub operations
-# GitHub's immutable subject format embeds numeric owner/repo IDs; names are still needed to look them up (requires 'gh auth login').
-# The owner ID comes from the repo itself, so it works for both organizations and personal accounts.
-$repoJson = gh api "repos/$Organization/$Repository" 2>&1
-if ($LASTEXITCODE -ne 0) { throw "Could not read $Organization/$Repository. Check 'gh auth status' (switch accounts with 'gh auth switch'). $repoJson" }
-$repoInfo = $repoJson | ConvertFrom-Json
-$orgId = [string]$repoInfo.owner.id
-$repoId = [string]$repoInfo.id
-if ($orgId -notmatch '^\d+$' -or $repoId -notmatch '^\d+$') { throw "Unexpected GitHub owner/repo IDs for $Organization/$Repository ('$orgId', '$repoId')." }
-$subjectPrefix = "repo:$Organization@$orgId/$Repository@$repoId"
-Write-Host "Subject prefix: $subjectPrefix"
+# GitHub decides per repository whether the subject is 'repo:owner/repo' or the immutable 'repo:owner@ownerId/repo@repoId' form,
+# so ask the repo for its subject prefix instead of building it (requires 'gh auth login' with access to the repo).
+$subjectJson = gh api "repos/$Organization/$Repository/actions/oidc/customization/sub" 2>&1
+if ($LASTEXITCODE -ne 0) { throw "Could not read the OIDC subject settings of $Organization/$Repository. Check 'gh auth status' (switch accounts with 'gh auth switch'). $subjectJson" }
+$subjectInfo = $subjectJson | ConvertFrom-Json
+$subjectPrefix = [string]$subjectInfo.sub_claim_prefix
+if ($subjectPrefix -notmatch '^repo:\S+$') { throw "Unexpected OIDC subject prefix for $Organization/$Repository ('$subjectPrefix')." }
+if (-not $subjectInfo.use_default) { Write-Warning "$Organization/$Repository customizes its OIDC subject claim; the credentials below assume the default claim keys." }
+Write-Host "Subject prefix: $subjectPrefix (immutable: $($subjectInfo.use_immutable_subject))"
 
 # Creates the credential, or recreates it when a credential of the same name has a different subject or issuer.
 function Set-FederatedCredential([string]$Name, [string]$Subject) {

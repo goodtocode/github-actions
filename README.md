@@ -57,7 +57,7 @@ A newer pull request run cancels the superseded one. Pushes to `main` queue inst
 
 ### GitHub to Azure federation
 
-Pipelines log in with OpenID Connect, so no secret is stored. Use one app registration per repository, named `github-<repo>`, and run `scripts/cd/New-Github-Azure-Federation.ps1` once per environment with the same `-PrincipalName`. Each run signs in to that environment's subscription, grants the app Contributor there, and appends a federated credential for that environment to the same app registration. Run it as an administrator, after `gh auth login` (the script looks up the numeric GitHub org and repo IDs).
+Pipelines log in with OpenID Connect, so no secret is stored. Use one app registration per repository, named `github-<repo>`, and run `scripts/cd/New-Github-Azure-Federation.ps1` once per environment with the same `-PrincipalName`. Each run signs in to that environment's subscription, grants the app Contributor there, and appends a federated credential for that environment to the same app registration. Run it as an administrator, after `gh auth login` (the script asks the repo for its OIDC subject prefix, which is `repo:owner/repo` or the immutable `repo:owner@ownerId/repo@repoId` form depending on the repo).
 
 ```powershell
 .\New-Github-Azure-Federation.ps1 -TenantId <tenant-guid> -SubscriptionId <platform-subscription-guid> `
