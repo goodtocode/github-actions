@@ -5,7 +5,7 @@ name: 'Workload Digital Product IaC'
 # Zero-trust (mode 4) must run from a runner inside the VNet.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 on:
   pull_request:
@@ -129,21 +129,16 @@ jobs:
           inlineScript: |
             az group create -n ${{ env.PRODUCT_RG_NAME }} -l ${{ env.LOCATION }}
 
+      # Azure/cli runs the script in a container, so step env does not reach it: pass the secrets inline (the Bicep parameter files read them with readEnvironmentVariable).
       - name: Validate ${{ env.PRODUCT_RG_NAME }}
         uses: Azure/cli@v3
-        env:
-          SQL_ADMIN_USER: ${{ secrets.SQL_ADMIN_USER }}
-          SQL_ADMIN_PASSWORD: ${{ secrets.SQL_ADMIN_PASSWORD }}
         with:
           inlineScript: |
-            az deployment group what-if --resource-group ${{ env.PRODUCT_RG_NAME }} --template-file ${{ env.PRODUCT_BICEP_TEMPLATE }} --parameters ${{ env.PRODUCT_BICEP_PARAMETERS }}
+            SQL_ADMIN_USER=${{ secrets.SQL_ADMIN_USER }} SQL_ADMIN_PASSWORD=${{ secrets.SQL_ADMIN_PASSWORD }} az deployment group what-if --resource-group ${{ env.PRODUCT_RG_NAME }} --template-file ${{ env.PRODUCT_BICEP_TEMPLATE }} --parameters ${{ env.PRODUCT_BICEP_PARAMETERS }}
 
       - name: Deploy ${{ env.PRODUCT_RG_NAME }}
         if: needs.plan.outputs.deploy == 'true'
         uses: Azure/cli@v3
-        env:
-          SQL_ADMIN_USER: ${{ secrets.SQL_ADMIN_USER }}
-          SQL_ADMIN_PASSWORD: ${{ secrets.SQL_ADMIN_PASSWORD }}
         with:
           inlineScript: |
-            az deployment group create --resource-group ${{ env.PRODUCT_RG_NAME }} --template-file ${{ env.PRODUCT_BICEP_TEMPLATE }} --parameters ${{ env.PRODUCT_BICEP_PARAMETERS }}
+            SQL_ADMIN_USER=${{ secrets.SQL_ADMIN_USER }} SQL_ADMIN_PASSWORD=${{ secrets.SQL_ADMIN_PASSWORD }} az deployment group create --resource-group ${{ env.PRODUCT_RG_NAME }} --template-file ${{ env.PRODUCT_BICEP_TEMPLATE }} --parameters ${{ env.PRODUCT_BICEP_PARAMETERS }}

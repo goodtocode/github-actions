@@ -20,7 +20,7 @@ Workflows are named after the `.azure` templates they deploy: `{platform|workloa
 | File | Purpose |
 |------|---------|
 | `workload-digitalproduct-iac.yml` | Deploy a digital product (any mode: standalone, shared, network, zerotrust), development then production |
-| `workload-digitalproduct-app.yml` | Build, test and deploy web, API and SQL migrations; components switched by `HAS_WEB`, `HAS_API`, `HAS_SQL` |
+| `workload-digitalproduct-app.yml` | Build, test and deploy web, API and SQL migrations; components switched by `HAS_WEB`, `HAS_API`, `HAS_SQL`, `HAS_E2E`; `MODE` picks where App Insights is read from |
 | `platform-shared-edge-iac.yml` | Phase 2 platform edge (Front Door) in the platform subscription |
 | `platform-shared-mgmt-iac.yml` | Phase 2 shared management, development then production |
 | `platform-shared-ai-iac.yml` | Azure AI (Foundry or Ollama) in the product's resource group; `AI_VARIANT` picks the template |
@@ -46,6 +46,8 @@ Environment pipelines run development first, then production behind the required
 All workflow YAML files in this repo are designed to:
 - **Trigger CI**: On any Pull Request (PR) to any branch (runs build/test/validate only)
 - **Trigger CD**: On push to the `main` branch (runs full deployment)
+
+A newer pull request run cancels the superseded one. Pushes to `main` queue instead, so a running deployment is never cancelled.
 
 | Workflow File                        | Purpose                                                                                 | CI Trigger (PR)         | CD Trigger (Push to main) |
 |--------------------------------------|-----------------------------------------------------------------------------------------|-------------------------|---------------------------|
@@ -96,7 +98,7 @@ Scripts are organized by function:
 5. **Push changes to trigger the workflows.**
 
 ### Example: Deploying a .NET Web API to Azure
-- Use `workload-digitalproduct-app.yml` and set `HAS_WEB`, `HAS_API` and `HAS_SQL` for the components you have.
+- Use `workload-digitalproduct-app.yml` and set `HAS_WEB`, `HAS_API` and `HAS_SQL` for the components you have. Set `MODE` to the same value as the IaC workflow, and `HAS_E2E` to `true` to run an end-to-end test project against the deployed API.
 - Ensure your repo contains a `.sln` and project files in the expected structure.
 - Add secrets: `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`, and (for SQL) `SQL_ADMIN_USER`, `SQL_ADMIN_PASSWORD`.
 - The workflow will build, test, publish, and deploy your app to Azure App Service, and (if using SQL) run EF Core migrations.
@@ -143,10 +145,14 @@ Set the required secrets in your GitHub repository for the deployment workflows.
 $secrets = @{
 	API_CLIENT_ID        = "<api-app-client-id>"
 	AZURE_CLIENT_ID      = "<azure-client-id>"
+	AZURE_OPENAI_APIKEY  = "<azure-openai-api-key>"
+	AZURE_OPENAI_ENDPOINT = "<azure-openai-endpoint>"
 	AZURE_SUBSCRIPTION_ID= "<azure-subscription-id>"
 	AZURE_TENANT_ID      = "<azure-tenant-id>"
+	E2E_CLIENT_ID        = "<e2e-app-client-id>"
+	E2E_CLIENT_SECRET    = "<e2e-app-client-secret>"
+	EEID_INSTANCE        = "<eeid-instance-url>"
 	EEID_TENANT_ID       = "<eeid-tenant-id>"
-	OPENAI_APIKEY        = "<openai-api-key>"
 	SQL_ADMIN_PASSWORD   = "<sql-admin-password>"
 	SQL_ADMIN_USER       = "<sql-admin-user>"
 	WEB_CLIENT_ID        = "<web-app-client-id>"
@@ -161,6 +167,12 @@ $secrets.GetEnumerator() | ForEach-Object {
 		-SecretName $_.Key \
 		-SecretValue $_.Value
 }
+```
+
+To upsert one secret across several repos or every repo of an owner (existing values are overwritten), use `-Repo a,b` or `-AllRepos`, add `-Environment development,production` for environment secrets, and preview with `-WhatIf`:
+
+```powershell
+./.github/scripts/repo/New-GithubSecret.ps1 -Owner <github-org-or-user> -AllRepos -Environment development,production -SecretName AZURE_OPENAI_APIKEY -SecretValue "<value>" -WhatIf
 ```
 
 If you are using a hub-and-spoke topology, also set:

@@ -5,7 +5,7 @@ name: 'Workload Digital Product App CI/CD'
 # 'production' environment's required reviewers.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 on:
   pull_request:
@@ -46,12 +46,15 @@ env:
   PRODUCT: "PRODUCT"
   REGION: "wus2"
   INSTANCE: "001"
+  # Same value as MODE in the IaC workflow. standalone: App Insights is in the product RG; any other mode: in the shared management RG.
+  MODE: "shared"
   # Shared management RG and App Insights from platform-shared-mgmt; product is normally 'mgmt'.
   MGMT_PRODUCT: "mgmt"
-  # Components that exist in this repo.
+  # Components that exist in this repo. HAS_E2E runs the end-to-end tests against the deployed API.
   HAS_WEB: "true"
   HAS_API: "true"
   HAS_SQL: "true"
+  HAS_E2E: "false"
   # ==============================================================================================================
   API_ARTIFACT_OUTPUT: 'publish_output'
   WEB_ARTIFACT_OUTPUT: 'publish_web_output'
@@ -66,6 +69,8 @@ jobs:
   ci:
     name: "App CI"
     runs-on: ubuntu-latest
+    # Test secrets (the Azure OpenAI endpoint and key) are read from the development environment.
+    environment: development
     strategy:
       matrix:
         DOTNET_VERSION: ["10.x"]
@@ -133,7 +138,8 @@ jobs:
         with:
           files: '${{ env.SRC_PATH }}/${{ env.API_PATH }}/appsettings.json, ${{ env.SRC_PATH }}/${{ env.API_PATH }}/appsettings.${{ env.RUNTIME_ENV }}.json, ${{ env.SRC_PATH }}/${{ env.TEST_PATH }}/appsettings.test.json'
         env:
-          OpenAI.ApiKey: ${{ secrets.OPENAI_APIKEY }}
+          AzureOpenAI.Endpoint: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
+          AzureOpenAI.ApiKey: ${{ secrets.AZURE_OPENAI_APIKEY }}
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v4
@@ -276,6 +282,11 @@ jobs:
       matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
     env:
       RUNTIME_ENV: ${{ matrix.runtime }}
+      DOTNET_VERSION: "10.x"
+      SRC_PATH: "./src"
+      E2E_PATH: "Tests.Endtoend"
+      E2E_PROJECT: "Tests.Endtoend.csproj"
+      CONFIGURATION: "Release"
 
     steps:
       # Hard-code any name here if it does not follow the slot pattern.
@@ -283,9 +294,16 @@ jobs:
         shell: bash
         run: |
           prefix="${PRODUCT}-${{ matrix.rgenv }}-${REGION}-${INSTANCE}"
+          if [ "$MODE" = "standalone" ]; then
+            appi_rg="${prefix}-rg"
+            appi="${prefix}-appi"
+          else
+            appi_rg="${MGMT_PRODUCT}-${{ matrix.rgenv }}-${REGION}-${INSTANCE}-rg"
+            appi="${MGMT_PRODUCT}-${{ matrix.rgenv }}-${REGION}-${INSTANCE}-appi"
+          fi
           {
-            echo "MGMT_RG_NAME=${MGMT_PRODUCT}-${{ matrix.rgenv }}-${REGION}-${INSTANCE}-rg"
-            echo "APPI_NAME=${MGMT_PRODUCT}-${{ matrix.rgenv }}-${REGION}-${INSTANCE}-appi"
+            echo "APPI_RG_NAME=${appi_rg}"
+            echo "APPI_NAME=${appi}"
             echo "AZURE_RG_NAME=${prefix}-rg"
             echo "AZURE_APIAPP_NAME=${prefix}-api"
             echo "AZURE_WEBAPP_NAME=${prefix}-web"
@@ -350,7 +368,7 @@ jobs:
         if: env.HAS_API == 'true'
         run: |
           az config set extension.use_dynamic_install=yes_without_prompt
-          $TEMP_JSON = az monitor app-insights component show -g ${{ env.MGMT_RG_NAME }} --app ${{ env.APPI_NAME }} | ConvertFrom-Json
+          $TEMP_JSON = az monitor app-insights component show -g ${{ env.APPI_RG_NAME }} --app ${{ env.APPI_NAME }} | ConvertFrom-Json
           $INSTR_KEY = $TEMP_JSON.instrumentationKey
           $CONN_STR = $TEMP_JSON.connectionString
           az webapp config appsettings set -g ${{ env.AZURE_RG_NAME }} -n ${{ env.AZURE_APIAPP_NAME }} --settings APPINSIGHTS_INSTRUMENTATIONKEY=$INSTR_KEY
@@ -358,7 +376,8 @@ jobs:
           az webapp config appsettings set -g ${{ env.AZURE_RG_NAME }} -n ${{ env.AZURE_APIAPP_NAME }} --settings ASPNETCORE_ENVIRONMENT=${{ env.RUNTIME_ENV }}
           az webapp config appsettings set -g ${{ env.AZURE_RG_NAME }} -n ${{ env.AZURE_APIAPP_NAME }} --settings EntraExternalId:TenantId=${{ secrets.EEID_TENANT_ID }}
           az webapp config appsettings set -g ${{ env.AZURE_RG_NAME }} -n ${{ env.AZURE_APIAPP_NAME }} --settings EntraExternalId:ClientId=${{ secrets.API_CLIENT_ID }}
-          az webapp config appsettings set -g ${{ env.AZURE_RG_NAME }} -n ${{ env.AZURE_APIAPP_NAME }} --settings OpenAI:ApiKey=${{ secrets.OPENAI_APIKEY }}
+          az webapp config appsettings set -g ${{ env.AZURE_RG_NAME }} -n ${{ env.AZURE_APIAPP_NAME }} --settings AzureOpenAI:Endpoint=${{ secrets.AZURE_OPENAI_ENDPOINT }}
+          az webapp config appsettings set -g ${{ env.AZURE_RG_NAME }} -n ${{ env.AZURE_APIAPP_NAME }} --settings AzureOpenAI:ApiKey=${{ secrets.AZURE_OPENAI_APIKEY }}
         shell: pwsh
 
       - name: ${{ env.AZURE_APIAPP_NAME }} connection strings
@@ -378,7 +397,7 @@ jobs:
         if: env.HAS_WEB == 'true'
         run: |
           az config set extension.use_dynamic_install=yes_without_prompt
-          $TEMP_JSON = az monitor app-insights component show -g ${{ env.MGMT_RG_NAME }} --app ${{ env.APPI_NAME }} | ConvertFrom-Json
+          $TEMP_JSON = az monitor app-insights component show -g ${{ env.APPI_RG_NAME }} --app ${{ env.APPI_NAME }} | ConvertFrom-Json
           $INSTR_KEY = $TEMP_JSON.instrumentationKey
           $CONN_STR = $TEMP_JSON.connectionString
           az webapp config appsettings set -g ${{ env.AZURE_RG_NAME }} -n ${{ env.AZURE_WEBAPP_NAME }} --settings APPINSIGHTS_INSTRUMENTATIONKEY=$INSTR_KEY
@@ -390,3 +409,33 @@ jobs:
           az webapp config appsettings set -g ${{ env.AZURE_RG_NAME }} -n ${{ env.AZURE_WEBAPP_NAME }} --settings BackendApi:BaseUrl="https://${{ env.AZURE_APIAPP_NAME }}.azurewebsites.net"
           az webapp config appsettings set -g ${{ env.AZURE_RG_NAME }} -n ${{ env.AZURE_WEBAPP_NAME }} --settings BackendApi:ClientId=${{ secrets.API_CLIENT_ID }}
         shell: pwsh
+
+      - name: Checkout repository for E2E tests
+        if: env.HAS_E2E == 'true'
+        uses: actions/checkout@v7
+
+      - name: dotnet version ${{ env.DOTNET_VERSION }}
+        if: env.HAS_E2E == 'true'
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Run E2E tests against ${{ env.AZURE_APIAPP_NAME }}
+        if: env.HAS_E2E == 'true'
+        run: dotnet test ${{ env.SRC_PATH }}/${{ env.E2E_PATH }}/${{ env.E2E_PROJECT }} --configuration ${{ env.CONFIGURATION }}
+        shell: pwsh
+        env:
+          BackendApi__BaseUrl: "https://${{ env.AZURE_APIAPP_NAME }}.azurewebsites.net"
+          BackendApi__ClientId: ${{ secrets.API_CLIENT_ID }}
+          EntraExternalId__Instance: ${{ secrets.EEID_INSTANCE }}
+          EntraExternalId__TenantId: ${{ secrets.EEID_TENANT_ID }}
+          EntraExternalId__ClientId: ${{ secrets.E2E_CLIENT_ID }}
+          EntraExternalId__ClientSecret: ${{ secrets.E2E_CLIENT_SECRET }}
+          EntraExternalId__ValidateAuthority: "true"
+
+      - name: Upload E2E test results
+        if: ${{ always() && env.HAS_E2E == 'true' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-test-results
+          path: ${{ env.SRC_PATH }}/TestResults/E2E
