@@ -24,7 +24,8 @@ Param(
     [string]$TestProjectFilter = '*Tests*.csproj',
     [ValidateSet('Debug', 'Release')]
     [string]$Configuration = 'Debug',
-    [switch]$IncludeTests
+    [switch]$IncludeTests,
+    [switch]$FailOnError
 )
 
 if ($IsWindows) {
@@ -32,6 +33,20 @@ if ($IsWindows) {
 }
 
 $ErrorActionPreference = 'Stop'
+
+function Stop-OrWarn {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Message
+    )
+
+    if ($FailOnError) {
+        throw $Message
+    }
+
+    Write-Warning $Message
+    return $false
+}
 
 function Install-DotnetCoverageTool {
     $tool = Get-Command dotnet-coverage -ErrorAction SilentlyContinue
@@ -227,7 +242,9 @@ $runStart = Get-Date
 
 $testProjects = Get-ChildItem -Path $resolvedRoot -Filter $TestProjectFilter -Recurse
 if ($testProjects.Count -eq 0) {
-    Write-Error "No test projects found under '$resolvedRoot' matching '$TestProjectFilter'."
+    if (-not (Stop-OrWarn -Message "No test projects found under '$resolvedRoot' matching '$TestProjectFilter'.")) {
+        return
+    }
 }
 
 Write-Host "Found $($testProjects.Count) test project(s)."
@@ -249,23 +266,79 @@ $coverageFiles = Get-ChildItem -Path $resolvedRoot -Filter '*.coverage' -Recurse
     Select-Object -ExpandProperty FullName
 
 if ($coverageFiles.Count -eq 0) {
-    Write-Error "No .coverage files found after test execution."
+    if (-not (Stop-OrWarn -Message "No .coverage files found after test execution.")) {
+        return
+    }
 }
 
 Install-DotnetCoverageTool
 
 Write-Host "Merging $($coverageFiles.Count) coverage file(s)..."
-dotnet-coverage merge $coverageFiles --output $combinedXml --output-format xml | Out-Null
 
-if (-not (Test-Path -Path $combinedXml)) {
-    Write-Error "Coverage XML was not generated at '$combinedXml'."
+$coverageXmlDocuments = @()
+$coverageXmlPaths = @()
+
+try {
+    dotnet-coverage merge $coverageFiles --output $combinedXml --output-format xml | Out-Null
+}
+catch {
+    Write-Warning ("Bulk coverage merge failed: {0}" -f $_.Exception.Message)
 }
 
-[xml]$xml = Get-Content -Path $combinedXml
-$modules = @($xml.results.modules.module)
+if (Test-Path -Path $combinedXml) {
+    try {
+        [xml]$bulkXml = Get-Content -Path $combinedXml
+        $coverageXmlDocuments += $bulkXml
+        $coverageXmlPaths += $combinedXml
+    }
+    catch {
+        Write-Warning ("Failed to parse merged coverage XML '{0}': {1}" -f $combinedXml, $_.Exception.Message)
+    }
+}
+
+if ($coverageXmlDocuments.Count -eq 0) {
+    $fallbackDir = Join-Path $resultsRoot "coverage-xml-$runStamp"
+    New-Item -ItemType Directory -Force -Path $fallbackDir | Out-Null
+
+    Write-Host "Falling back to per-file coverage conversion..."
+    $index = 0
+    foreach ($coverageFile in $coverageFiles) {
+        $index++
+        $singleXml = Join-Path $fallbackDir ("coverage-{0:D3}.xml" -f $index)
+
+        try {
+            dotnet-coverage merge @($coverageFile) --output $singleXml --output-format xml | Out-Null
+            if (-not (Test-Path -Path $singleXml)) {
+                Write-Warning ("Coverage XML was not produced for '{0}'." -f $coverageFile)
+                continue
+            }
+
+            [xml]$singleDoc = Get-Content -Path $singleXml
+            $coverageXmlDocuments += $singleDoc
+            $coverageXmlPaths += $singleXml
+        }
+        catch {
+            Write-Warning ("Skipping unreadable coverage file '{0}': {1}" -f $coverageFile, $_.Exception.Message)
+        }
+    }
+}
+
+if ($coverageXmlDocuments.Count -eq 0) {
+    if (-not (Stop-OrWarn -Message "Coverage XML could not be generated from any .coverage attachment.")) {
+        return
+    }
+}
+
+$modules = @(
+    foreach ($doc in $coverageXmlDocuments) {
+        @($doc.results.modules.module)
+    }
+)
 
 if ($modules.Count -eq 0) {
-    Write-Error "Coverage XML does not contain module data."
+    if (-not (Stop-OrWarn -Message "Coverage XML does not contain module data.")) {
+        return
+    }
 }
 
 $lineCovered = [int](($modules | Measure-Object -Property lines_covered -Sum).Sum)
@@ -378,4 +451,9 @@ if ($fileCoverageBottom.Count -gt 0) {
 }
 
 Write-Host ''
-Write-Host "Coverage xml  : $combinedXml" -ForegroundColor DarkGray
+if ($coverageXmlPaths.Count -eq 1) {
+    Write-Host "Coverage xml  : $($coverageXmlPaths[0])" -ForegroundColor DarkGray
+}
+else {
+    Write-Host "Coverage xml  : $($coverageXmlPaths.Count) files aggregated" -ForegroundColor DarkGray
+}

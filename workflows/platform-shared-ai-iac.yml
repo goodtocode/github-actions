@@ -4,7 +4,7 @@ name: 'Platform AI IaC'
 # AI_VARIANT picks the template and parameter files: shared-ai-foundry | shared-ai-ollama | spoke-ai-foundry | spoke-ai-ollama
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 on:
   pull_request:

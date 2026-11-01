@@ -3,7 +3,7 @@ name: 'Platform Edge IaC'
 # Phase 2: Azure Front Door Premium in the platform subscription. No hub, spoke or VNet.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 on:
   pull_request:

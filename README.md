@@ -20,7 +20,7 @@ Workflows are named after the `.azure` templates they deploy: `{platform|workloa
 | File | Purpose |
 |------|---------|
 | `workload-digitalproduct-iac.yml` | Deploy a digital product (any mode: standalone, shared, network, zerotrust), development then production |
-| `workload-digitalproduct-app.yml` | Build, test and deploy web, API and SQL migrations; components switched by `HAS_WEB`, `HAS_API`, `HAS_SQL` |
+| `workload-digitalproduct-app.yml` | Build, test and deploy web, API and SQL migrations; components switched by `HAS_WEB`, `HAS_API`, `HAS_SQL`, `HAS_E2E`; `MODE` picks where App Insights is read from |
 | `platform-shared-edge-iac.yml` | Phase 2 platform edge (Front Door) in the platform subscription |
 | `platform-shared-mgmt-iac.yml` | Phase 2 shared management, development then production |
 | `platform-shared-ai-iac.yml` | Azure AI (Foundry or Ollama) in the product's resource group; `AI_VARIANT` picks the template |
@@ -47,6 +47,8 @@ All workflow YAML files in this repo are designed to:
 - **Trigger CI**: On any Pull Request (PR) to any branch (runs build/test/validate only)
 - **Trigger CD**: On push to the `main` branch (runs full deployment)
 
+A newer pull request run cancels the superseded one. Pushes to `main` queue instead, so a running deployment is never cancelled.
+
 | Workflow File                        | Purpose                                                                                 | CI Trigger (PR)         | CD Trigger (Push to main) |
 |--------------------------------------|-----------------------------------------------------------------------------------------|-------------------------|---------------------------|
 | `workload-digitalproduct-app.yml` | Build, test and deploy web, API and SQL migrations                                 | Yes                    | Yes                      |
@@ -55,7 +57,7 @@ All workflow YAML files in this repo are designed to:
 
 ### GitHub to Azure federation
 
-Pipelines log in with OpenID Connect, so no secret is stored. Use one app registration per repository, named `github-<repo>`, and run `scripts/cd/New-Github-Azure-Federation.ps1` once per environment with the same `-PrincipalName`. Each run signs in to that environment's subscription, grants the app Contributor there, and appends a federated credential for that environment to the same app registration. Run it as an administrator, after `gh auth login` (the script looks up the numeric GitHub org and repo IDs).
+Pipelines log in with OpenID Connect, so no secret is stored. Use one app registration per repository, named `github-<repo>`, and run `scripts/cd/New-Github-Azure-Federation.ps1` once per environment with the same `-PrincipalName`. Each run signs in to that environment's subscription, grants the app Contributor there, and appends a federated credential for that environment to the same app registration. Run it as an administrator, after `gh auth login` (the script asks the repo for its OIDC subject prefix, which is `repo:owner/repo` or the immutable `repo:owner@ownerId/repo@repoId` form depending on the repo).
 
 ```powershell
 .\New-Github-Azure-Federation.ps1 -TenantId <tenant-guid> -SubscriptionId <platform-subscription-guid> `
@@ -75,6 +77,7 @@ Pipelines log in with OpenID Connect, so no secret is stored. Use one app regist
 
 - `-Environment` is the GitHub environment name and must exist in the repository. It accepts a list, but each run must use the subscription of its environments. Pipelines that set `environment:` present a subject for that environment, and the script adds one credential named `<PrincipalName>-env-<environment>` per environment. Rerunning is safe.
 - Use a different `-PrincipalName` for each repository. Two repositories sharing one app registration would share its credentials and roles.
+- `-Organization` can be an organization or a personal account. Rerunning replaces a credential whose subject is wrong. To switch GitHub accounts use `gh auth switch`. The Azure side switches to a saved context for the `-TenantId` and `-SubscriptionId`, or signs in to that tenant.
 - The app registration is the same across environments, so `AZURE_CLIENT_ID` and `AZURE_TENANT_ID` are the same value everywhere. `AZURE_SUBSCRIPTION_ID` differs. Because the app has Contributor on every subscription you ran it for, a workflow that can log in as the app could target any of them. Protect `production` with required reviewers and restrict who can edit workflows, or use a separate app registration per environment if you need a hard boundary.
 - The script also adds `main` and `pull_request` credentials. Those do not go through environment protection, so remove them if every job sets `environment:`.
 - It prints `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID` and `AZURE_CLIENT_ID`. Save them as secrets on the matching GitHub environment, not on the repository.
@@ -96,7 +99,7 @@ Scripts are organized by function:
 5. **Push changes to trigger the workflows.**
 
 ### Example: Deploying a .NET Web API to Azure
-- Use `workload-digitalproduct-app.yml` and set `HAS_WEB`, `HAS_API` and `HAS_SQL` for the components you have.
+- Use `workload-digitalproduct-app.yml` and set `HAS_WEB`, `HAS_API` and `HAS_SQL` for the components you have. Set `MODE` to the same value as the IaC workflow, and `HAS_E2E` to `true` to run an end-to-end test project against the deployed API.
 - Ensure your repo contains a `.sln` and project files in the expected structure.
 - Add secrets: `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`, and (for SQL) `SQL_ADMIN_USER`, `SQL_ADMIN_PASSWORD`.
 - The workflow will build, test, publish, and deploy your app to Azure App Service, and (if using SQL) run EF Core migrations.
@@ -143,10 +146,14 @@ Set the required secrets in your GitHub repository for the deployment workflows.
 $secrets = @{
 	API_CLIENT_ID        = "<api-app-client-id>"
 	AZURE_CLIENT_ID      = "<azure-client-id>"
+	AZURE_OPENAI_APIKEY  = "<azure-openai-api-key>"
+	AZURE_OPENAI_ENDPOINT = "<azure-openai-endpoint>"
 	AZURE_SUBSCRIPTION_ID= "<azure-subscription-id>"
 	AZURE_TENANT_ID      = "<azure-tenant-id>"
+	E2E_CLIENT_ID        = "<e2e-app-client-id>"
+	E2E_CLIENT_SECRET    = "<e2e-app-client-secret>"
+	EEID_INSTANCE        = "<eeid-instance-url>"
 	EEID_TENANT_ID       = "<eeid-tenant-id>"
-	OPENAI_APIKEY        = "<openai-api-key>"
 	SQL_ADMIN_PASSWORD   = "<sql-admin-password>"
 	SQL_ADMIN_USER       = "<sql-admin-user>"
 	WEB_CLIENT_ID        = "<web-app-client-id>"
@@ -161,6 +168,12 @@ $secrets.GetEnumerator() | ForEach-Object {
 		-SecretName $_.Key \
 		-SecretValue $_.Value
 }
+```
+
+To upsert one secret across several repos or every repo of an owner (existing values are overwritten), use `-Repo a,b` or `-AllRepos`, add `-Environment development,production` for environment secrets, and preview with `-WhatIf`:
+
+```powershell
+./.github/scripts/repo/New-GithubSecret.ps1 -Owner <github-org-or-user> -AllRepos -Environment development,production -SecretName AZURE_OPENAI_APIKEY -SecretValue "<value>" -WhatIf
 ```
 
 If you are using a hub-and-spoke topology, also set:

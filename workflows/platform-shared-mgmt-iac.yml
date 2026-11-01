@@ -4,7 +4,7 @@ name: 'Platform Mgmt IaC'
 # in the development and production subscriptions. No hub, spoke or VNet.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 on:
   pull_request:

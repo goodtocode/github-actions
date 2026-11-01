@@ -9,6 +9,13 @@ If script execution is blocked, set the policy for this process first: Set-Execu
 .EXAMPLE
 # From the script folder:
 .\New-Github-Azure-Federation.ps1  -TenantId 12343dac-0e69-436a-866b-456727dd3579 -SubscriptionId 12343dac-0e69-436a-866b-456727dd3579 -PrincipalName myco-github-development-100 -Organization mygithuborg -Repository mygithubrepo -Environment development,production
+
+.EXAMPLE
+# Personal account repo (the owner can be a user or an organization), different Azure tenant:
+.\New-Github-Azure-Federation.ps1  -TenantId <personal-tenant-id> -SubscriptionId <personal-subscription-id> -PrincipalName github-myrepo -Organization mygithubhandle -Repository myrepo -Environment development
+
+.NOTES
+Switching between accounts: the GitHub side uses the active 'gh' account (see 'gh auth status'; switch with 'gh auth switch'). The Azure side reuses a saved context for the tenant and subscription when one exists, otherwise it signs in to the -TenantId you pass.
 #>
 
 param (
@@ -30,7 +37,8 @@ Set-ExecutionPolicy Unrestricted -Scope Process -Force
 $VerbosePreference = 'SilentlyContinue' # 'SilentlyContinue' # 'Continue'
 [String]$ThisScript = $MyInvocation.MyCommand.Path
 [String]$ThisDir = Split-Path $ThisScript
-Set-Location $ThisDir # Ensure our location is correct, so we can use relative paths
+Push-Location $ThisDir # Ensure our location is correct, so we can use relative paths; restored on exit
+trap { Pop-Location -ErrorAction SilentlyContinue; break }
 Write-Host "*****************************"
 Write-Host "*** Starting: $ThisScript On: $(Get-Date)"
 Write-Host "*****************************"
@@ -52,11 +60,19 @@ try {
    $currentContext = Get-AzContext -ErrorAction Stop
 } catch {}
 
-if ($null -eq $currentContext -or $currentContext.Subscription.Id -ne $SubscriptionId) {
-   Write-Host "Logging in to Azure with SubscriptionId: $SubscriptionId"
-   Connect-AzAccount -TenantId $TenantId -SubscriptionId $SubscriptionId 
-} else {
-   Write-Host "Already logged in to the correct Azure subscription."
+if ($currentContext -and $currentContext.Subscription.Id -eq $SubscriptionId -and $currentContext.Tenant.Id -eq $TenantId) {
+   Write-Host "Already logged in to the correct Azure tenant and subscription."
+}
+else {
+   $savedContext = Get-AzContext -ListAvailable -ErrorAction SilentlyContinue | Where-Object { $_.Subscription.Id -eq $SubscriptionId -and $_.Tenant.Id -eq $TenantId } | Select-Object -First 1
+   if ($savedContext) {
+      Write-Host "Switching to saved Azure context for tenant $TenantId, subscription $SubscriptionId"
+      Set-AzContext -Context $savedContext | Out-Null
+   }
+   else {
+      Write-Host "Logging in to Azure with TenantId: $TenantId, SubscriptionId: $SubscriptionId"
+      Connect-AzAccount -TenantId $TenantId -SubscriptionId $SubscriptionId
+   }
 }
 
 # Get App Registration object (Application object)
@@ -113,39 +129,39 @@ Write-Host "Verified role assignment '$roleName' at '$roleScope'."
 $tenantId = (Get-AzContext).Subscription.TenantId
 
 # Create new App Registration Federated Credentials for the GitHub operations
-# GitHub's immutable subject format embeds numeric org/repo IDs; names are still needed to look them up (requires 'gh auth login').
-$orgId = gh api "orgs/$Organization" --jq .id
-$repoId = gh api "repos/$Organization/$Repository" --jq .id
-if (-not $orgId -or -not $repoId) { throw "Could not resolve GitHub org/repo IDs for $Organization/$Repository; run 'gh auth login' first." }
-$subjectPrefix = "repo:$Organization@$orgId/$Repository@$repoId"
-Write-Host "Subject prefix: $subjectPrefix"
+# GitHub decides per repository whether the subject is 'repo:owner/repo' or the immutable 'repo:owner@ownerId/repo@repoId' form,
+# so ask the repo for its subject prefix instead of building it (requires 'gh auth login' with access to the repo).
+$subjectJson = gh api "repos/$Organization/$Repository/actions/oidc/customization/sub" 2>&1
+if ($LASTEXITCODE -ne 0) { throw "Could not read the OIDC subject settings of $Organization/$Repository. Check 'gh auth status' (switch accounts with 'gh auth switch'). $subjectJson" }
+$subjectInfo = $subjectJson | ConvertFrom-Json
+$subjectPrefix = [string]$subjectInfo.sub_claim_prefix
+if ($subjectPrefix -notmatch '^repo:\S+$') { throw "Unexpected OIDC subject prefix for $Organization/$Repository ('$subjectPrefix')." }
+if (-not $subjectInfo.use_default) { Write-Warning "$Organization/$Repository customizes its OIDC subject claim; the credentials below assume the default claim keys." }
+Write-Host "Subject prefix: $subjectPrefix (immutable: $($subjectInfo.use_immutable_subject))"
 
-$existingCreds = @(Get-AzADAppFederatedCredential -ApplicationObjectId $appObjectId -ErrorAction SilentlyContinue)
-foreach ($envName in $Environment) {
-   $credName = "$PrincipalName-env-$envName"
-   if ($existingCreds | Where-Object { $_.Name -eq $credName }) {
-      Write-Host "Federated credential $credName already exists."
-      continue
+# Creates the credential, or recreates it when a credential of the same name has a different subject or issuer.
+function Set-FederatedCredential([string]$Name, [string]$Subject) {
+   $issuer = 'https://token.actions.githubusercontent.com'
+   $existing = Get-AzADAppFederatedCredential -ApplicationObjectId $appObjectId -ErrorAction SilentlyContinue | Where-Object { $_.Name -eq $Name }
+   if ($existing -and $existing.Subject -eq $Subject -and $existing.Issuer -eq $issuer) {
+      Write-Host "Federated credential $Name already exists."
+      return
    }
-   New-AzADAppFederatedCredential -ApplicationObjectId $appObjectId -Audience api://AzureADTokenExchange -Issuer 'https://token.actions.githubusercontent.com' -Name $credName -Subject "${subjectPrefix}:environment:$envName"
+   if ($existing) {
+      Write-Host "Federated credential $Name has a different subject or issuer. Recreating."
+      Remove-AzADAppFederatedCredential -ApplicationObjectId $appObjectId -FederatedCredentialId $existing.Id
+   }
+   New-AzADAppFederatedCredential -ApplicationObjectId $appObjectId -Audience api://AzureADTokenExchange -Issuer $issuer -Name $Name -Subject $Subject | Out-Null
+   Write-Host "Created federated credential $Name ($Subject)"
 }
-$subjectRepoMain = "${subjectPrefix}:ref:refs/heads/main"
-$existingCredMain = Get-AzADAppFederatedCredential -ApplicationObjectId $appObjectId -ErrorAction SilentlyContinue | Where-Object { $_.Name -eq "$PrincipalName-main" }
-if (-not $existingCredMain) {
-   New-AzADAppFederatedCredential -ApplicationObjectId $appObjectId -Audience api://AzureADTokenExchange -Issuer 'https://token.actions.githubusercontent.com' -Name "$PrincipalName-main" -Subject "$subjectRepoMain"
+
+foreach ($envName in $Environment) {
+   Set-FederatedCredential -Name "$PrincipalName-env-$envName" -Subject "${subjectPrefix}:environment:$envName"
 }
-else {
-   Write-Host "Federated credential $PrincipalName-main already exists."
-}
-$subjectRepoPR = "${subjectPrefix}:pull_request"
-$existingCredPR = Get-AzADAppFederatedCredential -ApplicationObjectId $appObjectId -ErrorAction SilentlyContinue | Where-Object { $_.Name -eq "$PrincipalName-PR" }
-if (-not $existingCredPR) {
-   New-AzADAppFederatedCredential -ApplicationObjectId $appObjectId -Audience api://AzureADTokenExchange -Issuer 'https://token.actions.githubusercontent.com' -Name "$PrincipalName-PR" -Subject "$subjectRepoPR"
-}
-else {
-   Write-Host "Federated credential $PrincipalName-PR already exists."
-}
+Set-FederatedCredential -Name "$PrincipalName-main" -Subject "${subjectPrefix}:ref:refs/heads/main"
+Set-FederatedCredential -Name "$PrincipalName-PR" -Subject "${subjectPrefix}:pull_request"
 
 Write-Host "AZURE_TENANT_ID: $tenantId"
 Write-Host "AZURE_SUBSCRIPTION_ID: $SubscriptionId"
 Write-Host "AZURE_CLIENT_ID: $clientId"
+Pop-Location
