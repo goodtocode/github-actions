@@ -2,7 +2,7 @@ name: 'Workload Digital Product IaC'
 
 # One pipeline for every mode and phase. The mode picks the parameter file; the environment matrix
 # runs development first, then production behind the 'production' environment's required reviewers.
-# Zero-trust (mode 4) must run from a runner inside the VNet.
+# Private-endpoint mode requires runner connectivity to its private services; shared/standalone do not require a VNet.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -15,6 +15,7 @@ on:
       - .github/workflows/workload-digitalproduct-iac.yml
       - .azure/**/*.bicep
       - .azure/**/*.bicepparam
+      - .github/scripts/cd/**
   push:
     branches:
       - main
@@ -22,6 +23,7 @@ on:
       - .github/workflows/workload-digitalproduct-iac.yml
       - .azure/**/*.bicep
       - .azure/**/*.bicepparam
+      - .github/scripts/cd/**
   workflow_dispatch:
     inputs:
       environment:
@@ -46,6 +48,9 @@ env:
   LOCATION: "westus2"
   # standalone | shared | network | zerotrust
   MODE: "shared"
+  IAC_DEPLOYMENT_NAME: "workload-digitalproduct"
+  AZURE_RESOURCE_GROUP_NAME: "" # Optional explicit RG; otherwise naming slots above.
+  SQL_ENTRA_ADMIN_GROUP_OBJECT_ID: "" # Set here or in the GitHub environment secret.
   # ===============================================================================================
   DOTNET_SYSTEM_GLOBALIZATION_INVARIANT: "true"
 
@@ -94,6 +99,9 @@ jobs:
     runs-on: ubuntu-latest
     needs: plan
     environment: ${{ matrix.environment }}
+    concurrency:
+      group: workload-deployment-${{ matrix.environment }}
+      cancel-in-progress: false
     strategy:
       fail-fast: true
       max-parallel: 1
@@ -105,9 +113,11 @@ jobs:
       # Hard-code the resource group name here if it does not follow the slot pattern.
       - name: Resolve names
         shell: bash
+        env:
+          RESOURCE_GROUP_OVERRIDE: ${{ env.AZURE_RESOURCE_GROUP_NAME }}
         run: |
           {
-            echo "PRODUCT_RG_NAME=${PRODUCT}-${{ matrix.rgenv }}-${REGION}-${INSTANCE}-rg"
+            echo "PRODUCT_RG_NAME=${RESOURCE_GROUP_OVERRIDE:-${PRODUCT}-${{ matrix.rgenv }}-${REGION}-${INSTANCE}-rg}"
             if [ "$MODE" = "zerotrust" ]; then
               echo "PRODUCT_BICEP_TEMPLATE=.azure/templates/workload-digitalproduct-zerotrust.bicep"
             else
@@ -116,29 +126,82 @@ jobs:
             echo "PRODUCT_BICEP_PARAMETERS=.azure/variables/workload-digitalproduct-${MODE}-${{ matrix.short }}.bicepparam"
           } >> "$GITHUB_ENV"
 
+      - name: Compile workload contract and parameters
+        shell: pwsh
+        run: |
+          az bicep build --stdout --file $env:PRODUCT_BICEP_TEMPLATE | Out-Null
+          if ($LASTEXITCODE -ne 0) { throw "Workload template compilation failed." }
+          az bicep build-params --stdout --file $env:PRODUCT_BICEP_PARAMETERS | Out-Null
+          if ($LASTEXITCODE -ne 0) { throw "Workload parameter compilation failed." }
+
+      - name: Check Entra-only SQL administrator inputs
+        if: github.event_name != 'pull_request'
+        shell: pwsh
+        env:
+          SQL_ENTRA_ADMIN_GROUP_OBJECT_ID: ${{ env.SQL_ENTRA_ADMIN_GROUP_OBJECT_ID || secrets.SQL_ENTRA_ADMIN_GROUP_OBJECT_ID }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+        run: |
+          $compiled = az bicep build-params --stdout --file $env:PRODUCT_BICEP_PARAMETERS | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0) { throw "Workload parameter compilation failed." }
+          $parameters = ($compiled.parametersJson | ConvertFrom-Json).parameters
+          if ($parameters.PSObject.Properties['sql'] -and $parameters.sql.value.server.kind -eq 'EntraOnly') {
+            foreach ($name in @('objectId', 'tenantId')) {
+              $id = [guid]::Empty
+              if (-not [guid]::TryParse($parameters.sql.value.server.administrator.$name, [ref]$id) -or $id -eq [guid]::Empty) {
+                throw "Configure SQL Entra administrator $name with a non-placeholder workload tenant/group ID."
+              }
+            }
+          }
+
       - name: "Az CLI login"
+        if: github.event_name != 'pull_request'
         uses: azure/login@v3
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Create ${{ env.PRODUCT_RG_NAME }}
-        uses: Azure/cli@v3
-        with:
-          inlineScript: |
-            az group create -n ${{ env.PRODUCT_RG_NAME }} -l ${{ env.LOCATION }}
+      - name: Validate referenced SQL authentication
+        if: github.event_name != 'pull_request'
+        shell: pwsh
+        env:
+          SQL_ENTRA_ADMIN_GROUP_OBJECT_ID: ${{ env.SQL_ENTRA_ADMIN_GROUP_OBJECT_ID || secrets.SQL_ENTRA_ADMIN_GROUP_OBJECT_ID }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+        run: |
+          $compiled = az bicep build-params --stdout --file $env:PRODUCT_BICEP_PARAMETERS | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0) { throw "Workload parameter compilation failed." }
+          $parameters = ($compiled.parametersJson | ConvertFrom-Json).parameters
+          if ($parameters.PSObject.Properties['sql'] -and $parameters.sql.value.server.kind -eq 'Existing') {
+            $sql = $parameters.sql.value
+            $subscription = if ($sql.server.PSObject.Properties['subscriptionId']) { $sql.server.subscriptionId } else { $env:AZURE_SUBSCRIPTION_ID }
+            $state = az sql server ad-only-auth get --resource-group $sql.server.resourceGroupName --name $sql.serverName --subscription $subscription --query azureADOnlyAuthentication --output tsv
+            if ($LASTEXITCODE -ne 0 -or $state -ne 'true') { throw "Referenced SQL server must already enforce Entra-only authentication. Its owner must configure it; this deployment will not alter server authentication." }
+          }
 
-      # Azure/cli runs the script in a container, so step env does not reach it: pass the secrets inline (the Bicep parameter files read them with readEnvironmentVariable).
+      - name: Create ${{ env.PRODUCT_RG_NAME }}
+        if: needs.plan.outputs.deploy == 'true'
+        shell: pwsh
+        run: |
+          az group create --name $env:PRODUCT_RG_NAME --location $env:LOCATION --output none
+          if ($LASTEXITCODE -ne 0) { throw "Resource group creation failed." }
+
       - name: Validate ${{ env.PRODUCT_RG_NAME }}
-        uses: Azure/cli@v3
-        with:
-          inlineScript: |
-            SQL_ADMIN_USER=${{ secrets.SQL_ADMIN_USER }} SQL_ADMIN_PASSWORD=${{ secrets.SQL_ADMIN_PASSWORD }} az deployment group what-if --resource-group ${{ env.PRODUCT_RG_NAME }} --template-file ${{ env.PRODUCT_BICEP_TEMPLATE }} --parameters ${{ env.PRODUCT_BICEP_PARAMETERS }}
+        if: github.event_name != 'pull_request'
+        shell: pwsh
+        env:
+          SQL_ENTRA_ADMIN_GROUP_OBJECT_ID: ${{ env.SQL_ENTRA_ADMIN_GROUP_OBJECT_ID || secrets.SQL_ENTRA_ADMIN_GROUP_OBJECT_ID }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+        run: |
+          az deployment group what-if --resource-group $env:PRODUCT_RG_NAME --template-file $env:PRODUCT_BICEP_TEMPLATE --parameters $env:PRODUCT_BICEP_PARAMETERS
+          if ($LASTEXITCODE -ne 0) { throw "Workload what-if failed." }
 
       - name: Deploy ${{ env.PRODUCT_RG_NAME }}
         if: needs.plan.outputs.deploy == 'true'
-        uses: Azure/cli@v3
-        with:
-          inlineScript: |
-            SQL_ADMIN_USER=${{ secrets.SQL_ADMIN_USER }} SQL_ADMIN_PASSWORD=${{ secrets.SQL_ADMIN_PASSWORD }} az deployment group create --resource-group ${{ env.PRODUCT_RG_NAME }} --template-file ${{ env.PRODUCT_BICEP_TEMPLATE }} --parameters ${{ env.PRODUCT_BICEP_PARAMETERS }}
+        shell: pwsh
+        env:
+          SQL_ENTRA_ADMIN_GROUP_OBJECT_ID: ${{ env.SQL_ENTRA_ADMIN_GROUP_OBJECT_ID || secrets.SQL_ENTRA_ADMIN_GROUP_OBJECT_ID }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+        run: |
+          az deployment group create --name $env:IAC_DEPLOYMENT_NAME --resource-group $env:PRODUCT_RG_NAME --template-file $env:PRODUCT_BICEP_TEMPLATE --parameters $env:PRODUCT_BICEP_PARAMETERS --output none
+          if ($LASTEXITCODE -ne 0) { throw "Workload deployment failed." }
