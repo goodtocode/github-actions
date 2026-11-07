@@ -15,7 +15,7 @@ param(
     [ValidateSet('Local', 'Cloud', 'Both')][string]$Mode = 'Local',
     [ValidateSet('Prepare', 'Complete', 'Check')][string]$Stage = 'Prepare',
     [ValidateSet('development', 'production')][string]$Environment = 'development',
-    [string]$Instance = '101',
+    [string]$Instance = '100',
     [string]$SignInTenantId,
     [string]$SignInInstanceUrl,
     [string]$WorkloadTenantId,

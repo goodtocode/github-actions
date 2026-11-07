@@ -20,7 +20,7 @@ Workflows are named after the `.azure` templates they deploy: `{platform|workloa
 | File | Purpose |
 |------|---------|
 | `workload-digitalproduct-iac.yml` | Deploy a digital product (any mode: standalone, shared, network, zerotrust), development then production |
-| `workload-digitalproduct-app.yml` | Build, test and deploy web, API and Entra SQL migrations; components switched by `HAS_WEB`, `HAS_API`, `HAS_SQL`, `HAS_E2E`; exact deployment outputs select app/monitoring/database targets |
+| `workload-digitalproduct-app.yml` | Build, test and deploy web, API and SQL migrations using Entra or SQL credentials; components switched by `HAS_WEB`, `HAS_API`, `HAS_SQL`, `HAS_E2E`; exact deployment outputs select app/monitoring/database targets |
 | `platform-shared-edge-iac.yml` | Phase 2 platform edge (Front Door) in the platform subscription |
 | `platform-shared-mgmt-iac.yml` | Phase 2 shared management, development then production |
 | `platform-shared-ai-iac.yml` | Azure AI (Foundry or Ollama) in the product's resource group; `AI_VARIANT` picks the template |
@@ -29,12 +29,17 @@ Workflows are named after the `.azure` templates they deploy: `{platform|workloa
 
 Consumer repos rename `workload-digitalproduct-*` to the product name, for example `crucible-iac.yml` and `crucible-app.yml`.
 
-### Digital-product SQL/identity contract
-
 ### Root Setup
 
-The product repositories expose `Initialize-Installation.ps1`, delegating to `scripts/setup/Initialize-Product.ps1`
-(copied to the consumer's `.github/scripts/setup`). Local mode reconciles sign-in registrations,
+Copy [Initialize-Installation.ps1](Initialize-Installation.ps1) to the consuming product root.
+Copy `scripts/` into the consumer's `.github/scripts/` and rename the digital-product workflows
+under `.github/workflows/` to the product's `*-iac.yml` and `*-app.yml` names.
+From `azure-arm`, copy `bicep/modules`, `bicep/types`, `bicep/templates`, and the selected
+`bicep/variables` into matching `.azure/` folders, and `scripts/` into `.azure/scripts/`.
+Keep the transitive modules/types/scripts together; copying only the top-level templates is insufficient.
+
+The root launcher delegates to [scripts/setup/Initialize-Product.ps1](scripts/setup/Initialize-Product.ps1).
+Local mode reconciles sign-in registrations,
 user-secrets and existing local migrations. Cloud Prepare ensures federation/environment/secrets,
 then exits so the operator can review/publish and run product IaC. Cloud Complete verifies the named
 deployment, adds hosted redirects, refreshes local telemetry and runs Entra SQL user provisioning
@@ -44,9 +49,24 @@ GitHub environment protections are preserved. Setup performs no commits, pushes 
 The setup-selected `SQL_SERVER_AUTHENTICATION` secret selects owned-server creation policy without
 allowing conversions, and the explicit administrator-group secret takes precedence over YAML.
 
-Copy the corresponding `azure-arm` modules/types/templates and the helpers in `scripts/cd` to the consumer's `.github/scripts/cd`. Both workflow files use `IAC_DEPLOYMENT_NAME` (default `workload-digitalproduct`); IaC must successfully deploy that name before app CD. Set the environment variable `AZURE_RESOURCE_GROUP_NAME` to override the example RG naming slots in both workflows. For a web-only deployment, supply `BACKEND_API_BASE_URL` and the external API client ID. PR IaC checks compile offline and do not create resource groups or sign in to Azure.
+```powershell
+./Initialize-Installation.ps1 -Mode Local
+./Initialize-Installation.ps1 -Mode Cloud -SqlAuthentication SqlAuth
+# Review and run the product IaC workflow, then resume:
+./Initialize-Installation.ps1 -Mode Cloud -Stage Complete
+```
 
-Set `SQL_ENTRA_ADMIN_GROUP_OBJECT_ID` in IaC YAML `env` to an existing workload-tenant administrator group. When empty, an environment secret of the same name is used. Non-secret RG overrides and web-only backend URLs are also YAML settings; no GitHub Variables are required. `AZURE_TENANT_ID` comes from the existing OIDC login configuration. Example parameter GUID placeholders are accepted only for compilation; deployment validates non-placeholder administrator IDs before creating resources.
+The optional `scripts/setup/Initialize-Development.ps1` retains AFQS's advanced local-only
+options for deployment-name overrides, telemetry and an explicit local connection string.
+It is copied to `.github/scripts/setup/`; the installation launcher remains the primary entry point.
+The installer currently recognizes the Crucible, Compass and AFQS solution layouts. Other layouts
+must adapt product/project discovery rather than assuming that copying the launcher alone configures them.
+
+### Digital-product SQL/identity contract
+
+Both workflow files use `IAC_DEPLOYMENT_NAME` (default `workload-digitalproduct`); IaC must successfully deploy that name before app CD. Set the environment variable `AZURE_RESOURCE_GROUP_NAME` to override the example RG naming slots in both workflows. For a web-only deployment, supply `BACKEND_API_BASE_URL` and the external API client ID. PR IaC checks compile offline and do not create resource groups or sign in to Azure.
+
+Set the environment secret `SQL_ENTRA_ADMIN_GROUP_OBJECT_ID` to an existing workload-tenant administrator group. The secret takes precedence over the YAML `env` fallback. Non-secret RG overrides and web-only backend URLs are YAML settings; no GitHub Variables are required. `AZURE_TENANT_ID` comes from the existing OIDC login configuration. Example parameter GUID placeholders are accepted only for compilation; deployment validates non-placeholder administrator IDs before creating resources.
 
 After the Entra-only database exists, an already authorized SQL administrator must run `azure-arm/scripts/sql/Set-AzureSqlManagedIdentityUsers.ps1` once to grant the API UAMI client ID runtime DML and the GitHub OIDC application client ID migration DML/DDL. Repeat bootstrap safely when needed. This does not grant Azure RBAC, create directory objects, or automatically authorize the GitHub principal as SQL administrator.
 

@@ -280,6 +280,18 @@ Describe 'Deployment scripts' {
 }
 
 Describe 'Root setup orchestration' {
+    It 'ships a root launcher and optional development helper with the copy bundle' {
+        $launcher = Join-Path $PSScriptRoot '..\..\Initialize-Installation.ps1'
+        Test-Path $launcher | Should -BeTrue
+        Test-Path (Join-Path $PSScriptRoot '..\setup\Initialize-Development.ps1') | Should -BeTrue
+        foreach ($path in @($launcher, (Join-Path $PSScriptRoot '..\setup\Initialize-Development.ps1'))) {
+            $tokens = $null
+            $errors = $null
+            [void][System.Management.Automation.Language.Parser]::ParseFile($path, [ref]$tokens, [ref]$errors)
+            $errors | Should -BeNullOrEmpty
+        }
+    }
+
     BeforeEach {
         $script:setupRoot = Join-Path $TestDrive ([guid]::NewGuid().ToString('N'))
         foreach ($directory in @('src/Presentation.Api', 'src/Presentation.Web', '.azure/scripts', '.github/scripts/cd')) {
@@ -301,6 +313,19 @@ Describe 'Root setup orchestration' {
         Set-Content (Join-Path $setupRoot $Solution) 'synthetic solution fixture'
         $output = & $initializer -RepositoryRoot $setupRoot -Mode Both -Stage Check 6>&1
         ($output | Out-String) | Should -Match "verified for $Product"
+        Should -Invoke Read-Host -Times 0 -Exactly
+        Should -Invoke dotnet -Times 0 -Exactly
+    }
+
+    It 'runs the copied root launcher with the copied helper in a consuming repository' {
+        Set-Content (Join-Path $setupRoot 'Goodtocode.AgentFramework.Web.slnx') 'synthetic solution fixture'
+        $folder = Join-Path $setupRoot '.github/scripts/setup'
+        New-Item -ItemType Directory $folder -Force | Out-Null
+        Copy-Item $initializer (Join-Path $folder 'Initialize-Product.ps1')
+        $launcher = Join-Path $setupRoot 'Initialize-Installation.ps1'
+        Copy-Item (Join-Path $PSScriptRoot '..\..\Initialize-Installation.ps1') $launcher
+        $output = & $launcher -Mode Local -Stage Check 6>&1
+        ($output | Out-String) | Should -Match 'verified for agent'
         Should -Invoke Read-Host -Times 0 -Exactly
         Should -Invoke dotnet -Times 0 -Exactly
     }
