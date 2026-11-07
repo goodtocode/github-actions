@@ -346,8 +346,8 @@ jobs:
           if ($env:HAS_WEB -eq 'true' -and -not $targets.webAppName) { throw "Web component is not deployed." }
           if ($env:HAS_SQL -eq 'true') {
             if (-not $targets.sqlServerHost -or -not $targets.sqlDatabaseName) { throw "SQL component is not deployed." }
-            if ($targets.sqlServerKind -notin @('EntraOnly', 'Existing')) { throw "SQL deployment must use the Entra-only workload contract." }
-            if ($env:HAS_API -eq 'true' -and -not $targets.apiManagedIdentityClientId) { throw "Configure the API user-assigned identity before selecting managed-identity SQL access." }
+            if ($targets.sqlServerKind -notin @('EntraOnly', 'SqlAuth', 'Existing')) { throw "Unsupported SQL deployment contract." }
+            if ($targets.sqlServerKind -ne 'SqlAuth' -and $env:HAS_API -eq 'true' -and -not $targets.apiManagedIdentityClientId) { throw "Configure the API user-assigned identity before selecting managed-identity SQL access." }
           }
           "AZURE_APIAPP_NAME=$($targets.apiAppName)" >> $env:GITHUB_ENV
           "AZURE_WEBAPP_NAME=$($targets.webAppName)" >> $env:GITHUB_ENV
@@ -355,16 +355,46 @@ jobs:
           "APPLICATION_INSIGHTS_RESOURCE_ID=$($targets.applicationInsightsResourceId)" >> $env:GITHUB_ENV
           "SQL_SERVER_HOST=$($targets.sqlServerHost)" >> $env:GITHUB_ENV
           "SQLDB_NAME=$($targets.sqlDatabaseName)" >> $env:GITHUB_ENV
+          "SQL_AUTHENTICATION=$($targets.sqlServerKind)" >> $env:GITHUB_ENV
           "API_MANAGED_IDENTITY_CLIENT_ID=$($targets.apiManagedIdentityClientId)" >> $env:GITHUB_ENV
+
+      - name: Provision SQL-auth database access
+        if: env.HAS_SQL == 'true' && env.SQL_AUTHENTICATION == 'SqlAuth'
+        shell: pwsh
+        env:
+          SQL_ADMIN_USER: ${{ secrets.SQL_ADMIN_USER }}
+          SQL_ADMIN_PASSWORD: ${{ secrets.SQL_ADMIN_PASSWORD }}
+          SQL_MIGRATION_USER: ${{ secrets.SQL_MIGRATION_USER }}
+          SQL_MIGRATION_PASSWORD: ${{ secrets.SQL_MIGRATION_PASSWORD }}
+        run: |
+          foreach ($name in @('SQL_ADMIN_USER', 'SQL_ADMIN_PASSWORD', 'SQL_MIGRATION_USER', 'SQL_MIGRATION_PASSWORD')) {
+            if ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($name))) { throw "Configure $name before provisioning SQL-auth access." }
+          }
+          if (-not (Get-Module -ListAvailable SqlServer | Where-Object { $_.Version -ge [version]'22.0' })) {
+            Install-Module SqlServer -MinimumVersion 22.0 -Scope CurrentUser -Force
+          }
+          $administrator = [pscredential]::new($env:SQL_ADMIN_USER, (ConvertTo-SecureString $env:SQL_ADMIN_PASSWORD -AsPlainText -Force))
+          $migration = [pscredential]::new($env:SQL_MIGRATION_USER, (ConvertTo-SecureString $env:SQL_MIGRATION_PASSWORD -AsPlainText -Force))
+          $runtime = @{}
+          if ($env:HAS_API -eq 'true') { $runtime.ApiAppName = $env:AZURE_APIAPP_NAME; $runtime.ResourceGroupName = $env:AZURE_RG_NAME }
+          & ./.github/scripts/cd/Set-AzureSqlPasswordUsers.ps1 -ServerHost $env:SQL_SERVER_HOST -DatabaseName $env:SQLDB_NAME -Administrator $administrator -Migration $migration @runtime
 
       - name: Deploy SQL script
         if: env.HAS_SQL == 'true'
         shell: pwsh
+        env:
+          SQL_MIGRATION_USER: ${{ secrets.SQL_MIGRATION_USER }}
+          SQL_MIGRATION_PASSWORD: ${{ secrets.SQL_MIGRATION_PASSWORD }}
         run: |
           if (-not (Get-Module -ListAvailable SqlServer | Where-Object { $_.Version -ge [version]'22.0' })) {
             Install-Module SqlServer -MinimumVersion 22.0 -Scope CurrentUser -Force
           }
-          & ./.github/scripts/cd/Invoke-AzureSqlMigration.ps1 -ServerHost $env:SQL_SERVER_HOST -DatabaseName $env:SQLDB_NAME -ScriptPath $env:MIGRATION_ARTIFACT_PATH
+          $authentication = @{}
+          if ($env:SQL_AUTHENTICATION -eq 'SqlAuth') {
+            if (-not $env:SQL_MIGRATION_USER -or -not $env:SQL_MIGRATION_PASSWORD) { throw "Configure the separate SQL migration credential." }
+            $authentication.SqlCredential = [pscredential]::new($env:SQL_MIGRATION_USER, (ConvertTo-SecureString $env:SQL_MIGRATION_PASSWORD -AsPlainText -Force))
+          }
+          & ./.github/scripts/cd/Invoke-AzureSqlMigration.ps1 -ServerHost $env:SQL_SERVER_HOST -DatabaseName $env:SQLDB_NAME -ScriptPath $env:MIGRATION_ARTIFACT_PATH @authentication
 
       - name: ${{ env.AZURE_APIAPP_NAME }} app settings
         if: env.HAS_API == 'true'
@@ -397,7 +427,7 @@ jobs:
         shell: pwsh
 
       - name: ${{ env.AZURE_APIAPP_NAME }} connection strings
-        if: env.HAS_API == 'true' && env.HAS_SQL == 'true'
+        if: env.HAS_API == 'true' && env.HAS_SQL == 'true' && env.SQL_AUTHENTICATION != 'SqlAuth'
         run: |
           $connection = [System.Data.Common.DbConnectionStringBuilder]::new()
           $connection['Server'] = "tcp:$env:SQL_SERVER_HOST,1433"
@@ -407,7 +437,7 @@ jobs:
           $connection['Encrypt'] = 'True'
           $connection['TrustServerCertificate'] = 'False'
           az webapp config connection-string set -g $env:AZURE_RG_NAME -n $env:AZURE_APIAPP_NAME -t SQLServer --settings "DefaultConnection=$($connection.ConnectionString)" --output none
-          if ($LASTEXITCODE -ne 0) { throw "Unable to configure managed-identity SQL access." }
+          if ($LASTEXITCODE -ne 0) { throw "Unable to configure SQL access." }
         shell: pwsh
 
       - name: Deploy ${{ env.AZURE_APIAPP_NAME }}

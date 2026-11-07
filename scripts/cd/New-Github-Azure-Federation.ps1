@@ -30,7 +30,8 @@ param (
    [Parameter(Mandatory = $true, ValueFromPipelineByPropertyName = $true)]
    [string]$Repository = $(throw '-Repository is a required parameter.'), #GitHub Repository Name
    [Parameter(Mandatory = $true, ValueFromPipelineByPropertyName = $true)]
-   [string[]]$Environment = $(throw    '-Environment is a required parameter.') #GitHub Repository Environment(s): development, production
+   [string[]]$Environment = $(throw    '-Environment is a required parameter.'), #GitHub Repository Environment(s): development, production
+   [switch]$PassThru
    )
 ####################################################################################
 Set-ExecutionPolicy Unrestricted -Scope Process -Force
@@ -165,3 +166,6 @@ Write-Host "AZURE_TENANT_ID: $tenantId"
 Write-Host "AZURE_SUBSCRIPTION_ID: $SubscriptionId"
 Write-Host "AZURE_CLIENT_ID: $clientId"
 Pop-Location
+if ($PassThru) {
+   [pscustomobject]@{ ClientId = [string]$clientId; ServicePrincipalId = [string]$spObjectId; TenantId = [string]$TenantId; SubscriptionId = [string]$SubscriptionId }
+}

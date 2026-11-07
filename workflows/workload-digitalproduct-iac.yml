@@ -128,6 +128,9 @@ jobs:
 
       - name: Compile workload contract and parameters
         shell: pwsh
+        env:
+          SQL_ENTRA_ADMIN_GROUP_OBJECT_ID: "00000000-0000-0000-0000-000000000000"
+          AZURE_TENANT_ID: "00000000-0000-0000-0000-000000000000"
         run: |
           az bicep build --stdout --file $env:PRODUCT_BICEP_TEMPLATE | Out-Null
           if ($LASTEXITCODE -ne 0) { throw "Workload template compilation failed." }
@@ -138,13 +141,14 @@ jobs:
         if: github.event_name != 'pull_request'
         shell: pwsh
         env:
-          SQL_ENTRA_ADMIN_GROUP_OBJECT_ID: ${{ env.SQL_ENTRA_ADMIN_GROUP_OBJECT_ID || secrets.SQL_ENTRA_ADMIN_GROUP_OBJECT_ID }}
+          SQL_ENTRA_ADMIN_GROUP_OBJECT_ID: ${{ secrets.SQL_ENTRA_ADMIN_GROUP_OBJECT_ID || env.SQL_ENTRA_ADMIN_GROUP_OBJECT_ID }}
           AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          SQL_SERVER_AUTHENTICATION: ${{ secrets.SQL_SERVER_AUTHENTICATION }}
         run: |
           $compiled = az bicep build-params --stdout --file $env:PRODUCT_BICEP_PARAMETERS | ConvertFrom-Json
           if ($LASTEXITCODE -ne 0) { throw "Workload parameter compilation failed." }
           $parameters = ($compiled.parametersJson | ConvertFrom-Json).parameters
-          if ($parameters.PSObject.Properties['sql'] -and $parameters.sql.value.server.kind -eq 'EntraOnly') {
+          if ($parameters.PSObject.Properties['sql'] -and $parameters.sql.value.server.kind -eq 'EntraOnly' -and $env:SQL_SERVER_AUTHENTICATION -ne 'SqlAuth') {
             foreach ($name in @('objectId', 'tenantId')) {
               $id = [guid]::Empty
               if (-not [guid]::TryParse($parameters.sql.value.server.administrator.$name, [ref]$id) -or $id -eq [guid]::Empty) {
@@ -161,23 +165,25 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Validate referenced SQL authentication
+      - name: Select SQL creation or ordinary update
         if: github.event_name != 'pull_request'
         shell: pwsh
         env:
-          SQL_ENTRA_ADMIN_GROUP_OBJECT_ID: ${{ env.SQL_ENTRA_ADMIN_GROUP_OBJECT_ID || secrets.SQL_ENTRA_ADMIN_GROUP_OBJECT_ID }}
+          SQL_ENTRA_ADMIN_GROUP_OBJECT_ID: ${{ secrets.SQL_ENTRA_ADMIN_GROUP_OBJECT_ID || env.SQL_ENTRA_ADMIN_GROUP_OBJECT_ID }}
           AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
           AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          SQL_ADMIN_PASSWORD: ${{ secrets.SQL_ADMIN_PASSWORD }}
+          SQL_ADMIN_USER: ${{ secrets.SQL_ADMIN_USER }}
+          SQL_SERVER_AUTHENTICATION: ${{ secrets.SQL_SERVER_AUTHENTICATION }}
         run: |
           $compiled = az bicep build-params --stdout --file $env:PRODUCT_BICEP_PARAMETERS | ConvertFrom-Json
           if ($LASTEXITCODE -ne 0) { throw "Workload parameter compilation failed." }
           $parameters = ($compiled.parametersJson | ConvertFrom-Json).parameters
-          if ($parameters.PSObject.Properties['sql'] -and $parameters.sql.value.server.kind -eq 'Existing') {
-            $sql = $parameters.sql.value
-            $subscription = if ($sql.server.PSObject.Properties['subscriptionId']) { $sql.server.subscriptionId } else { $env:AZURE_SUBSCRIPTION_ID }
-            $state = az sql server ad-only-auth get --resource-group $sql.server.resourceGroupName --name $sql.serverName --subscription $subscription --query azureADOnlyAuthentication --output tsv
-            if ($LASTEXITCODE -ne 0 -or $state -ne 'true') { throw "Referenced SQL server must already enforce Entra-only authentication. Its owner must configure it; this deployment will not alter server authentication." }
+          $createServer = $false
+          if ($parameters.PSObject.Properties['sql']) {
+            $createServer = & ./.github/scripts/cd/Get-WorkloadSqlCreateMode.ps1 -SqlConfiguration $parameters.sql.value -ResourceGroupName $env:PRODUCT_RG_NAME -SubscriptionId $env:AZURE_SUBSCRIPTION_ID
           }
+          "SQL_CREATE_SERVER=$($createServer.ToString().ToLowerInvariant())" >> $env:GITHUB_ENV
 
       - name: Create ${{ env.PRODUCT_RG_NAME }}
         if: needs.plan.outputs.deploy == 'true'
@@ -190,18 +196,46 @@ jobs:
         if: github.event_name != 'pull_request'
         shell: pwsh
         env:
-          SQL_ENTRA_ADMIN_GROUP_OBJECT_ID: ${{ env.SQL_ENTRA_ADMIN_GROUP_OBJECT_ID || secrets.SQL_ENTRA_ADMIN_GROUP_OBJECT_ID }}
+          SQL_ENTRA_ADMIN_GROUP_OBJECT_ID: ${{ secrets.SQL_ENTRA_ADMIN_GROUP_OBJECT_ID || env.SQL_ENTRA_ADMIN_GROUP_OBJECT_ID }}
           AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          SQL_ADMIN_PASSWORD: ${{ secrets.SQL_ADMIN_PASSWORD }}
+          SQL_ADMIN_USER: ${{ secrets.SQL_ADMIN_USER }}
+          SQL_SERVER_AUTHENTICATION: ${{ secrets.SQL_SERVER_AUTHENTICATION }}
         run: |
-          az deployment group what-if --resource-group $env:PRODUCT_RG_NAME --template-file $env:PRODUCT_BICEP_TEMPLATE --parameters $env:PRODUCT_BICEP_PARAMETERS
+          az deployment group what-if --resource-group $env:PRODUCT_RG_NAME --template-file $env:PRODUCT_BICEP_TEMPLATE --parameters $env:PRODUCT_BICEP_PARAMETERS "sqlCreateServer=$env:SQL_CREATE_SERVER" "sqlAdministratorPassword=$env:SQL_ADMIN_PASSWORD" "sqlAdministratorLogin=$env:SQL_ADMIN_USER" "sqlAuthentication=$env:SQL_SERVER_AUTHENTICATION"
           if ($LASTEXITCODE -ne 0) { throw "Workload what-if failed." }
 
       - name: Deploy ${{ env.PRODUCT_RG_NAME }}
         if: needs.plan.outputs.deploy == 'true'
         shell: pwsh
         env:
-          SQL_ENTRA_ADMIN_GROUP_OBJECT_ID: ${{ env.SQL_ENTRA_ADMIN_GROUP_OBJECT_ID || secrets.SQL_ENTRA_ADMIN_GROUP_OBJECT_ID }}
+          SQL_ENTRA_ADMIN_GROUP_OBJECT_ID: ${{ secrets.SQL_ENTRA_ADMIN_GROUP_OBJECT_ID || env.SQL_ENTRA_ADMIN_GROUP_OBJECT_ID }}
           AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          SQL_ADMIN_PASSWORD: ${{ secrets.SQL_ADMIN_PASSWORD }}
+          SQL_ADMIN_USER: ${{ secrets.SQL_ADMIN_USER }}
+          SQL_SERVER_AUTHENTICATION: ${{ secrets.SQL_SERVER_AUTHENTICATION }}
         run: |
-          az deployment group create --name $env:IAC_DEPLOYMENT_NAME --resource-group $env:PRODUCT_RG_NAME --template-file $env:PRODUCT_BICEP_TEMPLATE --parameters $env:PRODUCT_BICEP_PARAMETERS --output none
+          az deployment group create --name $env:IAC_DEPLOYMENT_NAME --resource-group $env:PRODUCT_RG_NAME --template-file $env:PRODUCT_BICEP_TEMPLATE --parameters $env:PRODUCT_BICEP_PARAMETERS "sqlCreateServer=$env:SQL_CREATE_SERVER" "sqlAdministratorPassword=$env:SQL_ADMIN_PASSWORD" "sqlAdministratorLogin=$env:SQL_ADMIN_USER" "sqlAuthentication=$env:SQL_SERVER_AUTHENTICATION" --output none
           if ($LASTEXITCODE -ne 0) { throw "Workload deployment failed." }
+
+      - name: Provision SQL-auth database access
+        if: needs.plan.outputs.deploy == 'true'
+        shell: pwsh
+        env:
+          SQL_ADMIN_USER: ${{ secrets.SQL_ADMIN_USER }}
+          SQL_ADMIN_PASSWORD: ${{ secrets.SQL_ADMIN_PASSWORD }}
+          SQL_MIGRATION_USER: ${{ secrets.SQL_MIGRATION_USER }}
+          SQL_MIGRATION_PASSWORD: ${{ secrets.SQL_MIGRATION_PASSWORD }}
+        run: |
+          $targets = & ./.github/scripts/cd/Get-WorkloadDeployment.ps1 -ResourceGroupName $env:PRODUCT_RG_NAME -DeploymentName $env:IAC_DEPLOYMENT_NAME
+          if ($targets.sqlServerHost -and $targets.sqlServerKind -eq 'SqlAuth') {
+            foreach ($name in @('SQL_ADMIN_USER', 'SQL_ADMIN_PASSWORD', 'SQL_MIGRATION_USER', 'SQL_MIGRATION_PASSWORD')) {
+              if ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($name))) { throw "Configure $name before provisioning SQL-auth access." }
+            }
+            if (-not (Get-Module -ListAvailable SqlServer | Where-Object { $_.Version -ge [version]'22.0' })) {
+              Install-Module SqlServer -MinimumVersion 22.0 -Scope CurrentUser -Force
+            }
+            $administrator = [pscredential]::new($env:SQL_ADMIN_USER, (ConvertTo-SecureString $env:SQL_ADMIN_PASSWORD -AsPlainText -Force))
+            $migration = [pscredential]::new($env:SQL_MIGRATION_USER, (ConvertTo-SecureString $env:SQL_MIGRATION_PASSWORD -AsPlainText -Force))
+            & ./.github/scripts/cd/Set-AzureSqlPasswordUsers.ps1 -ServerHost $targets.sqlServerHost -DatabaseName $targets.sqlDatabaseName -Administrator $administrator -Migration $migration -ApiAppName $targets.apiAppName -ResourceGroupName $env:PRODUCT_RG_NAME
+          }

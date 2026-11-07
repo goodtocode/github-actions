@@ -31,29 +31,46 @@ Consumer repos rename `workload-digitalproduct-*` to the product name, for examp
 
 ### Digital-product SQL/identity contract
 
+### Root Setup
+
+The product repositories expose `Initialize-Installation.ps1`, delegating to `scripts/setup/Initialize-Product.ps1`
+(copied to the consumer's `.github/scripts/setup`). Local mode reconciles sign-in registrations,
+user-secrets and existing local migrations. Cloud Prepare ensures federation/environment/secrets,
+then exits so the operator can review/publish and run product IaC. Cloud Complete verifies the named
+deployment, adds hosted redirects, refreshes local telemetry and runs Entra SQL user provisioning
+as the authorized signed-in administrator. SQL-auth access is provisioned by the pipelines.
+Existing client secrets are reused, never silently rotated; missing values are prompted securely.
+GitHub environment protections are preserved. Setup performs no commits, pushes or destructive resets.
+The setup-selected `SQL_SERVER_AUTHENTICATION` secret selects owned-server creation policy without
+allowing conversions, and the explicit administrator-group secret takes precedence over YAML.
+
 Copy the corresponding `azure-arm` modules/types/templates and the helpers in `scripts/cd` to the consumer's `.github/scripts/cd`. Both workflow files use `IAC_DEPLOYMENT_NAME` (default `workload-digitalproduct`); IaC must successfully deploy that name before app CD. Set the environment variable `AZURE_RESOURCE_GROUP_NAME` to override the example RG naming slots in both workflows. For a web-only deployment, supply `BACKEND_API_BASE_URL` and the external API client ID. PR IaC checks compile offline and do not create resource groups or sign in to Azure.
 
 Set `SQL_ENTRA_ADMIN_GROUP_OBJECT_ID` in IaC YAML `env` to an existing workload-tenant administrator group. When empty, an environment secret of the same name is used. Non-secret RG overrides and web-only backend URLs are also YAML settings; no GitHub Variables are required. `AZURE_TENANT_ID` comes from the existing OIDC login configuration. Example parameter GUID placeholders are accepted only for compilation; deployment validates non-placeholder administrator IDs before creating resources.
 
 After the Entra-only database exists, an already authorized SQL administrator must run `azure-arm/scripts/sql/Set-AzureSqlManagedIdentityUsers.ps1` once to grant the API UAMI client ID runtime DML and the GitHub OIDC application client ID migration DML/DDL. Repeat bootstrap safely when needed. This does not grant Azure RBAC, create directory objects, or automatically authorize the GitHub principal as SQL administrator.
 
-IaC deploys the final Entra-only policy without a transition mode or SQL-password inputs.
-Run IaC, provision contained users as the authorized administrator, then run app CD.
-Applying IaC to an owned server enforces Entra-only immediately for every database; plan
-maintenance or a separately approved prototype rebuild rather than expecting compatibility.
-Referenced servers must already enforce Entra-only; the workflow validates this without
-modifying them. Verify real SQL-backed operations, sign-in, wrong-identity rejection, least
+IaC supports creation-time `EntraOnly` and `SqlAuth` choices. For `SqlAuth`, configure four GitHub
+environment secrets: `SQL_ADMIN_USER`, `SQL_ADMIN_PASSWORD`, `SQL_MIGRATION_USER`, and
+`SQL_MIGRATION_PASSWORD`. The administrator username overrides `sql.server.administratorLogin`.
+Never place a password inside the component configuration. Run IaC, then app CD; both pipelines
+automatically ensure database access with `Set-AzureSqlPasswordUsers.ps1`. `Get-WorkloadSqlCreateMode.ps1` uses read-only
+lookups to select creation versus ordinary updates. Updates omit creation-only authentication
+settings; mode or immutable SQL-login mismatches require operator-managed replacement.
+No pipeline converts authentication modes or deletes resources. Referenced servers must already
+match `sql.server.authentication` (default `EntraOnly`); the workflow never modifies them.
+Verify real SQL-backed operations, sign-in, wrong-identity rejection, least
 privilege and redeployment; `/health` is not SQL proof. The migration principal must not be a
 member of the administrator group. The deployment owner selects the administrator group in
 its own workload tenant; customer installations do not implicitly authorize publisher access.
 
 Both deployment jobs use the same environment concurrency group to prevent overlapping resource/app mutations. This lock does not order workflows: explicitly run changed IaC before app CD, and bootstrap before the first migration. Rebootstrap replacement identities/new databases. Administrator preparation is deliberately not a CI secret or automatic privilege escalation.
 
-`Get-WorkloadDeployment.ps1` requires a successful named deployment and reads explicit app/monitoring/SQL/identity outputs. `Invoke-AzureSqlMigration.ps1` uses the already logged-in Azure CLI identity and SqlServer module 22+; no SQL password, interactive token prompt, permission bootstrap, or destructive reset occurs in app CD. The workflow installs that module when absent, applies the migration, and configures hosted SqlClient for the explicitly selected API UAMI.
+`Get-WorkloadDeployment.ps1` requires a successful named deployment and reads explicit app/monitoring/SQL/identity outputs. `Invoke-AzureSqlMigration.ps1` uses the already logged-in Azure CLI identity or an explicit SQL migration credential with SqlServer module 22+. SQL-auth provisioning uses the administrator only to ensure a contained migration user with DML/DDL and a separate runtime user with DML. Runtime passwords are generated cryptographically, stored in the API's `DefaultConnection` App Service connection string, and reused on later deployments. No `SQL_RUNTIME_*` secrets, Key Vault, interactive prompts, or manual SQL user creation are required for this path. Conflicting users, elevated permissions, or unrelated existing connection strings fail closed rather than being silently adopted. Entra app CD uses the explicitly selected API UAMI. Both paths require encrypted, certificate-validated connections.
 
 Migration execution rejects `db_owner` and a principal lacking `db_ddladmin`; product-specific grants require administrator review. External ID Instance/ValidateAuthority settings are retained in both app configurations. Never print configuration responses containing the remaining AI/web secrets.
 
-The app workflow accepts only the Entra-only workload contract and requires an explicit API UAMI client ID for SQL-backed APIs. An existing server must already authorize the chosen Entra identities and runner connectivity. Adopting an existing database requires a separate owner-approved review. Product-specific migrations may need reviewed additional migration permissions. Normal CD never wipes databases; any cloud reset is a separate explicitly targeted, confirmed operation, never an implicit extension of a local reset.
+The app workflow consumes the selected SQL authentication contract and requires an explicit API UAMI client ID when using managed identity. An existing server must already authorize the chosen identities or SQL users and runner connectivity. Adopting an existing database requires a separate owner-approved review. Product-specific migrations may need reviewed additional migration permissions. Normal CD never wipes databases; any cloud reset is a separate explicitly targeted, confirmed operation, never an implicit extension of a local reset.
 
 AI test credentials are process environment variables, not substituted into published appsettings. AI runtime keys and External ID web credentials are deliberately unchanged in this slice; they require separate authentication work. Local clone/debug setup does not acquire managed identities or change LocalDB authentication.
 
