@@ -19,6 +19,7 @@ param(
     [string]$SubscriptionId,
     [string]$GitHubOwner,
     [string]$GitHubRepository,
+    [string]$GitHubPrincipalName,
     [string]$ResourceGroupName,
     [ValidateSet('EntraOnly', 'SqlAuth')][string]$SqlAuthentication = 'EntraOnly',
     [string]$SqlAdministratorGroupObjectId,
@@ -193,8 +194,11 @@ try {
     $SubscriptionId = Read-Setting 'SubscriptionId' $SubscriptionId
     $GitHubOwner = Read-Setting 'GitHubOwner' $GitHubOwner
     $GitHubRepository = Read-Setting 'GitHubRepository' $GitHubRepository $product
+    if (-not $GitHubPrincipalName) {
+        $GitHubPrincipalName = if ($apiValues["${setupPrefix}:GitHubPrincipalName"]) { [string]$apiValues["${setupPrefix}:GitHubPrincipalName"] } else { "github-$product" }
+    }
     $ResourceGroupName = Read-Setting 'ResourceGroupName' $ResourceGroupName "$product-$short-wus2-$Instance-rg"
-    Save-Settings $apiProject @{ "${setupPrefix}:SignInTenantId" = $SignInTenantId; "${setupPrefix}:SignInInstanceUrl" = $SignInInstanceUrl; "${setupPrefix}:WorkloadTenantId" = $WorkloadTenantId; "${setupPrefix}:SubscriptionId" = $SubscriptionId; "${setupPrefix}:GitHubOwner" = $GitHubOwner; "${setupPrefix}:GitHubRepository" = $GitHubRepository; "${setupPrefix}:ResourceGroupName" = $ResourceGroupName }
+    Save-Settings $apiProject @{ "${setupPrefix}:SignInTenantId" = $SignInTenantId; "${setupPrefix}:SignInInstanceUrl" = $SignInInstanceUrl; "${setupPrefix}:WorkloadTenantId" = $WorkloadTenantId; "${setupPrefix}:SubscriptionId" = $SubscriptionId; "${setupPrefix}:GitHubOwner" = $GitHubOwner; "${setupPrefix}:GitHubRepository" = $GitHubRepository; "${setupPrefix}:GitHubPrincipalName" = $GitHubPrincipalName; "${setupPrefix}:ResourceGroupName" = $ResourceGroupName }
     gh auth status | Out-Null
     if ($LASTEXITCODE -ne 0) { gh auth login; if ($LASTEXITCODE -ne 0) { throw 'GitHub authentication failed.' } }
     $repository = "$GitHubOwner/$GitHubRepository"
@@ -212,9 +216,8 @@ try {
             gh api --method PUT "repos/$repository/environments/$Environment" | Out-Null
             if ($LASTEXITCODE -ne 0) { throw 'GitHub environment creation failed.' }
         }
-        $federation = @(& "$RepositoryRoot/.github/scripts/cd/New-Github-Azure-Federation.ps1" -TenantId $WorkloadTenantId -SubscriptionId $SubscriptionId -PrincipalName "github-$product-$short-$Instance" -Organization $GitHubOwner -Repository $GitHubRepository -Environment $Environment -PassThru) | Where-Object { $_ -and $_.PSObject.Properties['ClientId'] } | Select-Object -Last 1
+        $federation = @(& "$RepositoryRoot/.github/scripts/cd/New-Github-Azure-Federation.ps1" -TenantId $WorkloadTenantId -SubscriptionId $SubscriptionId -PrincipalName $GitHubPrincipalName -Organization $GitHubOwner -Repository $GitHubRepository -Environment $Environment -PassThru) | Where-Object { $_ -and $_.PSObject.Properties['ClientId'] } | Select-Object -Last 1
         if (-not $federation) { throw 'Federation setup did not return its structured client ID.' }
-        Save-Settings $apiProject @{ "${setupPrefix}:DeploymentClientId" = [string]$federation.ClientId }
         $apiValues = Get-DotnetUserSecrets $apiProject
         $webValues = Get-DotnetUserSecrets $webProject
         $secrets = @{
@@ -261,14 +264,11 @@ try {
     if ($e2eProject) { Save-Settings $e2eProject @{ 'BackendApi:BaseUrl' = $apiUrl } }
     if ($targets.sqlServerKind -eq 'EntraOnly') {
         $apiValues = Get-DotnetUserSecrets $apiProject
-        $migrationClientId = $apiValues["${setupPrefix}:DeploymentClientId"]
-        if (-not $migrationClientId) {
-            $appsJson = az ad app list --display-name "github-$product-$short-$Instance" --output json
-            if ($LASTEXITCODE -ne 0) { throw 'Unable to resolve the deployment application in the workload tenant.' }
-            $apps = @($appsJson | ConvertFrom-Json | Where-Object { $_.displayName -eq "github-$product-$short-$Instance" })
-            if ($apps.Count -ne 1) { throw 'Exactly one matching deployment application is required. Run Prepare with the original environment and instance.' }
-            $migrationClientId = $apps[0].appId
-        }
+        $appsJson = az ad app list --display-name $GitHubPrincipalName --output json
+        if ($LASTEXITCODE -ne 0) { throw 'Unable to resolve the deployment application in the workload tenant.' }
+        $apps = @($appsJson | ConvertFrom-Json | Where-Object { $_.displayName -eq $GitHubPrincipalName })
+        if ($apps.Count -ne 1) { throw 'Exactly one matching deployment application is required. Run Prepare with the same GitHub principal name.' }
+        $migrationClientId = $apps[0].appId
         if (-not (Get-Module -ListAvailable SqlServer | Where-Object { $_.Version -ge [version]'22.0' })) { Install-Module SqlServer -MinimumVersion 22.0 -Scope CurrentUser -Force }
         Write-Host 'Provisioning Entra SQL access with the signed-in workload identity. That identity must be in the configured SQL administrator group.'
         & "$RepositoryRoot/.azure/scripts/sql/Set-AzureSqlManagedIdentityUsers.ps1" -ServerHost $targets.sqlServerHost -DatabaseName $targets.sqlDatabaseName -RuntimeName $targets.apiAppName -RuntimeClientId $targets.apiManagedIdentityClientId -MigrationName "github-$product-$short-$Instance" -MigrationClientId $migrationClientId

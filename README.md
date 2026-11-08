@@ -105,7 +105,7 @@ Each phase adds to the previous one. Pick the phase that fits and copy only its 
 | 3. Enterprise network foundation | same | Phase 2 plus `platform-hub-iac.yml`, `platform-spoke-iac.yml` | same |
 | 4. Zero trust private services | same | Phase 3 with the zero-trust templates | same |
 
-Environment pipelines run development first, then production behind the required reviewers of the `production` environment. Create one Azure identity per environment with `scripts/cd/New-Github-Azure-Federation.ps1`.
+Environment pipelines run development first, then production behind the required reviewers of the `production` environment. Reuse one Azure identity per repository with `scripts/cd/New-Github-Azure-Federation.ps1`, adding an environment credential and subscription permissions for each environment.
 
 ### Triggers
 All workflow YAML files in this repo are designed to:
@@ -123,6 +123,8 @@ A newer pull request run cancels the superseded one. Pushes to `main` queue inst
 ### GitHub to Azure federation
 
 Pipelines log in with OpenID Connect, so no secret is stored. Use one app registration per repository, named `github-<repo>`, and run `scripts/cd/New-Github-Azure-Federation.ps1` once per environment with the same `-PrincipalName`. Each run signs in to that environment's subscription, grants the app Contributor there, and appends a federated credential for that environment to the same app registration. Run it as an administrator, after `gh auth login` (the script asks the repo for its OIDC subject prefix, which is `repo:owner/repo` or the immutable `repo:owner@ownerId/repo@repoId` form depending on the repo).
+
+Product setup defaults to `github-<product>` and accepts `-GitHubPrincipalName` to reuse an existing registration. Matching issuer, subject, and audience credentials are reused without deleting unrelated credentials.
 
 ```powershell
 .\New-Github-Azure-Federation.ps1 -TenantId <tenant-guid> -SubscriptionId <platform-subscription-guid> `

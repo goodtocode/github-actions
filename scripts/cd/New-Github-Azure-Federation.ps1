@@ -61,11 +61,11 @@ try {
    $currentContext = Get-AzContext -ErrorAction Stop
 } catch {}
 
-if ($currentContext -and $currentContext.Subscription.Id -eq $SubscriptionId -and $currentContext.Tenant.Id -eq $TenantId) {
+if ($currentContext -and $currentContext.Subscription -and $currentContext.Tenant -and $currentContext.Subscription.Id -eq $SubscriptionId -and $currentContext.Tenant.Id -eq $TenantId) {
    Write-Host "Already logged in to the correct Azure tenant and subscription."
 }
 else {
-   $savedContext = Get-AzContext -ListAvailable -ErrorAction SilentlyContinue | Where-Object { $_.Subscription.Id -eq $SubscriptionId -and $_.Tenant.Id -eq $TenantId } | Select-Object -First 1
+   $savedContext = Get-AzContext -ListAvailable -ErrorAction SilentlyContinue | Where-Object { $_.Subscription -and $_.Tenant -and $_.Subscription.Id -eq $SubscriptionId -and $_.Tenant.Id -eq $TenantId } | Select-Object -First 1
    if ($savedContext) {
       Write-Host "Switching to saved Azure context for tenant $TenantId, subscription $SubscriptionId"
       Set-AzContext -Context $savedContext | Out-Null
@@ -77,7 +77,9 @@ else {
 }
 
 # Get App Registration object (Application object)
-$app = Get-AzADApplication -DisplayName $PrincipalName
+$apps = @(Get-AzADApplication -DisplayName $PrincipalName -ErrorAction Stop | Where-Object { $_.DisplayName -eq $PrincipalName })
+if ($apps.Count -gt 1) { throw "Multiple app registrations named '$PrincipalName' exist. Resolve the ambiguity before continuing." }
+$app = if ($apps.Count -eq 1) { $apps[0] } else { $null }
 if (-not $app) {
    $app = New-AzADApplication -DisplayName $PrincipalName
 }
@@ -86,7 +88,7 @@ $clientId = $app.AppId
 $appObjectId = $app.Id
 
 # Create Service Principal and assign role
-$sp = Get-AzADServicePrincipal -DisplayName $PrincipalName
+$sp = Get-AzADServicePrincipal -ApplicationId $clientId -ErrorAction Stop
 if (-not $sp) {
    $sp = New-AzADServicePrincipal -ApplicationId $clientId
 }
@@ -140,19 +142,23 @@ if ($subjectPrefix -notmatch '^repo:\S+$') { throw "Unexpected OIDC subject pref
 if (-not $subjectInfo.use_default) { Write-Warning "$Organization/$Repository customizes its OIDC subject claim; the credentials below assume the default claim keys." }
 Write-Host "Subject prefix: $subjectPrefix (immutable: $($subjectInfo.use_immutable_subject))"
 
-# Creates the credential, or recreates it when a credential of the same name has a different subject or issuer.
 function Set-FederatedCredential([string]$Name, [string]$Subject) {
    $issuer = 'https://token.actions.githubusercontent.com'
-   $existing = Get-AzADAppFederatedCredential -ApplicationObjectId $appObjectId -ErrorAction SilentlyContinue | Where-Object { $_.Name -eq $Name }
-   if ($existing -and $existing.Subject -eq $Subject -and $existing.Issuer -eq $issuer) {
-      Write-Host "Federated credential $Name already exists."
+   $audience = 'api://AzureADTokenExchange'
+   $credentials = @(Get-AzADAppFederatedCredential -ApplicationObjectId $appObjectId -ErrorAction Stop)
+   $existing = @($credentials | Where-Object { $_.Subject -ceq $Subject -and $_.Issuer -ceq $issuer })
+   if ($existing.Count -gt 0) {
+      if (-not (@($existing[0].Audience) -ccontains $audience)) { throw "Existing federated credential for '$Subject' has an incompatible audience." }
+      Write-Host "Federated credential for $Subject already exists."
       return
    }
-   if ($existing) {
-      Write-Host "Federated credential $Name has a different subject or issuer. Recreating."
-      Remove-AzADAppFederatedCredential -ApplicationObjectId $appObjectId -FederatedCredentialId $existing.Id
+   if (@($credentials | Where-Object { $_.Name -eq $Name }).Count -gt 0) {
+      $bytes = [System.Text.Encoding]::UTF8.GetBytes($Subject)
+      $suffix = [Convert]::ToHexString([System.Security.Cryptography.SHA256]::HashData($bytes)).Substring(0, 12).ToLowerInvariant()
+      $Name = "$Name-$suffix"
+      if (@($credentials | Where-Object { $_.Name -eq $Name }).Count -gt 0) { throw "Federated credential name '$Name' is already in use for another subject." }
    }
-   New-AzADAppFederatedCredential -ApplicationObjectId $appObjectId -Audience api://AzureADTokenExchange -Issuer $issuer -Name $Name -Subject $Subject | Out-Null
+   New-AzADAppFederatedCredential -ApplicationObjectId $appObjectId -Audience $audience -Issuer $issuer -Name $Name -Subject $Subject | Out-Null
    Write-Host "Created federated credential $Name ($Subject)"
 }
 

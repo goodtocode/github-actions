@@ -22,6 +22,7 @@ param(
     [string]$SubscriptionId,
     [string]$GitHubOwner,
     [string]$GitHubRepository,
+    [string]$GitHubPrincipalName,
     [string]$ResourceGroupName,
     [ValidateSet('EntraOnly', 'SqlAuth')][string]$SqlAuthentication = 'EntraOnly',
     [string]$SqlAdministratorGroupObjectId,
