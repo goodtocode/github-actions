@@ -17,6 +17,16 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+function New-AzureSqlRuntimePassword {
+    $characters = @(
+        [char][System.Security.Cryptography.RandomNumberGenerator]::GetInt32(65, 91)
+        [char][System.Security.Cryptography.RandomNumberGenerator]::GetInt32(97, 123)
+        [char][System.Security.Cryptography.RandomNumberGenerator]::GetInt32(48, 58)
+        [char][System.Security.Cryptography.RandomNumberGenerator]::GetInt32(33, 48)
+    )
+    return (-join $characters) + [Convert]::ToBase64String([System.Security.Cryptography.RandomNumberGenerator]::GetBytes(48))
+}
+
 if ($Administrator.UserName -eq $Migration.UserName -or $Migration.UserName.Length -gt 128 -or [string]::IsNullOrWhiteSpace($Migration.UserName)) {
     throw 'Migration must use a distinct database user name of 1-128 characters.'
 }
@@ -47,7 +57,7 @@ if ($ApiAppName) {
         $runtimePassword = $runtimeConnection.get_Password()
     }
     else {
-        $runtimePassword = 'Aa1!' + [Convert]::ToBase64String([System.Security.Cryptography.RandomNumberGenerator]::GetBytes(48))
+        $runtimePassword = New-AzureSqlRuntimePassword
         $runtimeConnection.set_DataSource("tcp:$ServerHost,1433")
         $runtimeConnection.set_InitialCatalog($DatabaseName)
         $runtimeConnection.set_UserID($runtimeName)

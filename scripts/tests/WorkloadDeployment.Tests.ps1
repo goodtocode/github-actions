@@ -4,6 +4,7 @@ BeforeAll {
     $script:selector = Join-Path $PSScriptRoot '..\cd\Get-WorkloadSqlCreateMode.ps1'
     $script:passwordProvisioner = Join-Path $PSScriptRoot '..\cd\Set-AzureSqlPasswordUsers.ps1'
     $script:initializer = Join-Path $PSScriptRoot '..\setup\Initialize-Product.ps1'
+    $script:testPassword = [Convert]::ToBase64String([System.Security.Cryptography.RandomNumberGenerator]::GetBytes(32))
 }
 
 Describe 'Workload deployment targets' {
@@ -133,7 +134,7 @@ Describe 'Deployment scripts' {
             $sqlState.ServerList = '[]'
             $saved = $env:SQL_ADMIN_PASSWORD
             try {
-                $env:SQL_ADMIN_PASSWORD = 'synthetic-example-only'
+                $env:SQL_ADMIN_PASSWORD = $script:testPassword
                 (& $selector -SqlConfiguration $configuration -ResourceGroupName prototype-rg -SubscriptionId prototype-subscription) | Should -BeTrue
             }
             finally { $env:SQL_ADMIN_PASSWORD = $saved }
@@ -202,7 +203,7 @@ Describe 'Deployment scripts' {
         }
 
         It 'uses an explicit SQL migration credential without acquiring an Entra token' {
-            $credential = [pscredential]::new('prototype-migrations', (ConvertTo-SecureString 'synthetic-example-only' -AsPlainText -Force))
+            $credential = [pscredential]::new('prototype-migrations', (ConvertTo-SecureString $script:testPassword -AsPlainText -Force))
             & $migrator -ServerHost product.database.windows.net -DatabaseName product -ScriptPath "$TestDrive\migration.sql" -SqlCredential $credential
             Should -Invoke az -Times 0 -Exactly
             Should -Invoke Invoke-Sqlcmd -Times 2 -Exactly -ParameterFilter { $Credential.UserName -eq 'prototype-migrations' -and -not $AccessToken -and $Encrypt -eq 'Mandatory' }
@@ -363,6 +364,23 @@ Describe 'Root setup orchestration' {
 }
 
 Describe 'Password user provisioning' {
+    It 'generates distinct SQL-complex passwords without a fixed credential prefix' {
+        $tokens = $null
+        $errors = $null
+        $ast = [System.Management.Automation.Language.Parser]::ParseFile($passwordProvisioner, [ref]$tokens, [ref]$errors)
+        $function = $ast.Find({ param($node) $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq 'New-AzureSqlRuntimePassword' }, $true)
+        $generator = $function.Body.GetScriptBlock()
+        $values = @(1..20 | ForEach-Object { & $generator })
+        ($values | Select-Object -Unique).Count | Should -Be 20
+        foreach ($value in $values) {
+            $value.Length | Should -BeLessOrEqual 128
+            $value | Should -Match '[A-Z]'
+            $value | Should -Match '[a-z]'
+            $value | Should -Match '[0-9]'
+            $value | Should -Match '[^a-zA-Z0-9]'
+        }
+    }
+
     It 'parses its parameterized provisioning batch with the Microsoft T-SQL parser' {
         Import-Module SqlServer -MinimumVersion 22.0
         $assembly = Get-ChildItem (Get-Module SqlServer).ModuleBase -Filter Microsoft.SqlServer.TransactSql.ScriptDom.dll -Recurse | Select-Object -First 1
@@ -380,24 +398,31 @@ Describe 'Password user provisioning' {
     }
 
     It 'rejects shared administrator and migration credentials before accessing resources' {
-        $credential = [pscredential]::new('prototype-admin', (ConvertTo-SecureString 'synthetic-example-only' -AsPlainText -Force))
+        $credential = [pscredential]::new('prototype-admin', (ConvertTo-SecureString $script:testPassword -AsPlainText -Force))
         Mock az { throw 'Azure must not be called.' }
         { & $passwordProvisioner -ServerHost prototype.database.windows.net -DatabaseName prototype -Administrator $credential -Migration $credential } | Should -Throw '*distinct database user*'
         Should -Invoke az -Times 0 -Exactly
     }
 
     It 'fails closed when runtime credential storage cannot be read' {
-        $administrator = [pscredential]::new('prototype-admin', (ConvertTo-SecureString 'synthetic-example-only' -AsPlainText -Force))
-        $migration = [pscredential]::new('prototype-migration', (ConvertTo-SecureString 'synthetic-example-only' -AsPlainText -Force))
+        $administrator = [pscredential]::new('prototype-admin', (ConvertTo-SecureString $script:testPassword -AsPlainText -Force))
+        $migration = [pscredential]::new('prototype-migration', (ConvertTo-SecureString $script:testPassword -AsPlainText -Force))
         Mock az { $global:LASTEXITCODE = 1 }
         { & $passwordProvisioner -ServerHost prototype.database.windows.net -DatabaseName prototype -Administrator $administrator -Migration $migration -ApiAppName prototype-api -ResourceGroupName prototype-rg } | Should -Throw '*No users were changed*'
         Should -Invoke az -Times 1 -Exactly
     }
 
     It 'rejects conflicting runtime configuration before connecting to SQL' {
-        $administrator = [pscredential]::new('prototype-admin', (ConvertTo-SecureString 'synthetic-example-only' -AsPlainText -Force))
-        $migration = [pscredential]::new('prototype-migration', (ConvertTo-SecureString 'synthetic-example-only' -AsPlainText -Force))
-        Mock az { $global:LASTEXITCODE = 0; '[{"name":"DefaultConnection","connectionString":"Server=other.database.windows.net;Database=other;User Id=other;Password=synthetic-example-only"}]' }
+        $administrator = [pscredential]::new('prototype-admin', (ConvertTo-SecureString $script:testPassword -AsPlainText -Force))
+        $migration = [pscredential]::new('prototype-migration', (ConvertTo-SecureString $script:testPassword -AsPlainText -Force))
+        Import-Module SqlServer -MinimumVersion 22.0
+        $connection = [Microsoft.Data.SqlClient.SqlConnectionStringBuilder]::new()
+        $connection.set_DataSource('other.database.windows.net')
+        $connection.set_InitialCatalog('other')
+        $connection.set_UserID('other')
+        $connection.set_Password($script:testPassword)
+        $mockResponse = @(@{ name = 'DefaultConnection'; connectionString = $connection.get_ConnectionString() }) | ConvertTo-Json -Compress
+        Mock az -MockWith { $global:LASTEXITCODE = 0; $mockResponse }.GetNewClosure()
         { & $passwordProvisioner -ServerHost prototype.database.windows.net -DatabaseName prototype -Administrator $administrator -Migration $migration -ApiAppName prototype-api -ResourceGroupName prototype-rg } | Should -Throw '*does not match*'
         Should -Invoke az -Times 1 -Exactly
     }
@@ -411,6 +436,7 @@ Describe 'Password user provisioning' {
         $source | Should -Match 'COMMIT TRANSACTION'
         $source | Should -Match 'runtimePassword = \$runtimeConnection.get_Password\(\)'
         $source | Should -Match 'RandomNumberGenerator.*GetBytes\(48\)'
+        $source | Should -Match 'New-AzureSqlRuntimePassword'
         $source | Should -Match '::add-mask::'
         $source | Should -Not -Match 'ALTER SERVER|ALTER ROLE \[db_owner\]'
         $source | Should -Not -Match 'DefaultConnection=.*(Administrator|Migration)'
