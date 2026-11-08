@@ -79,6 +79,17 @@ function Read-PrivateSetting([string]$Name, [hashtable]$Values, [string]$Key) {
     if (-not $value) { throw "$Name is required; an empty value will not replace an existing credential." }
     return $value
 }
+function Confirm-SqlAdministratorGroup([string]$ObjectId, [string]$TenantId) {
+    $groupId = [guid]::Empty
+    if (-not [guid]::TryParse($ObjectId, [ref]$groupId) -or $groupId -eq [guid]::Empty) { throw 'SQL administrator group object ID must be a nonempty GUID.' }
+    $context = Get-AzContext -ErrorAction Stop
+    if (-not $context -or -not $context.Tenant -or [string]$context.Tenant.Id -ne $TenantId) { throw "Sign in to workload tenant '$TenantId' before validating the SQL administrator group." }
+    try { $groups = @(Get-AzADGroup -ObjectId $groupId -DefaultProfile $context -ErrorAction Stop) }
+    catch { throw "Unable to read SQL administrator group '$ObjectId' in workload tenant '$TenantId'. Verify the group and directory read permissions." }
+    if ($groups.Count -ne 1 -or $groups[0].SecurityEnabled -ne $true) {
+        throw "SQL administrator group '$ObjectId' must be an existing security group in workload tenant '$TenantId'."
+    }
+}
 function Save-Settings([string]$Project, [hashtable]$Values) {
     if (-not (Set-DotnetUserSecrets -ProjectPath $Project -Secrets $Values)) { throw 'Setup could not persist configuration. No credentials will be printed.' }
 }
@@ -236,7 +247,11 @@ try {
             foreach ($name in @('SQL_ADMIN_PASSWORD', 'SQL_MIGRATION_PASSWORD')) { $secrets[$name] = Read-PrivateSetting $name $apiValues "${setupPrefix}:$name" }
             Save-Settings $apiProject @{ "${setupPrefix}:SQL_ADMIN_USER" = $secrets.SQL_ADMIN_USER; "${setupPrefix}:SQL_MIGRATION_USER" = $secrets.SQL_MIGRATION_USER; "${setupPrefix}:SQL_ADMIN_PASSWORD" = $secrets.SQL_ADMIN_PASSWORD; "${setupPrefix}:SQL_MIGRATION_PASSWORD" = $secrets.SQL_MIGRATION_PASSWORD }
         }
-        else { $secrets.SQL_ENTRA_ADMIN_GROUP_OBJECT_ID = Read-Setting 'SqlAdministratorGroupObjectId' $SqlAdministratorGroupObjectId }
+        else {
+            $groupObjectId = Read-Setting 'SqlAdministratorGroupObjectId' $SqlAdministratorGroupObjectId
+            Confirm-SqlAdministratorGroup -ObjectId $groupObjectId -TenantId $WorkloadTenantId
+            $secrets.SQL_ENTRA_ADMIN_GROUP_OBJECT_ID = $groupObjectId
+        }
         & "$RepositoryRoot/.github/scripts/repo/New-GithubSecret.ps1" -Owner $GitHubOwner -Repo $GitHubRepository -Environment $Environment -Secrets $secrets
         if ($LASTEXITCODE -ne 0) { throw 'GitHub secret preparation did not complete successfully. Fix access and rerun Prepare.' }
         Write-Host "Preparation complete. Review $product-iac.yml naming, parameter-file authentication and shared dependencies; run that workflow with environment=$Environment and runcd=true."

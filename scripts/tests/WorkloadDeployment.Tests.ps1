@@ -56,12 +56,16 @@ Describe 'Workload deployment targets' {
 
     It 'fails explicitly when the deployment cannot be read' {
         Mock az { $global:LASTEXITCODE = 1 }
-        { & $reader -ResourceGroupName rg -DeploymentName deployment } | Should -Throw '*Deploy infrastructure first*'
+        { & $reader -ResourceGroupName rg -DeploymentName deployment } | Should -Throw '*deployment*rg*exit code 1*'
     }
 
     It 'rejects failed or unfinished infrastructure before consuming outputs' {
-        Mock az { $global:LASTEXITCODE = 0; '{"provisioningState":"Failed","outputs":{}}' }
-        { & $reader -ResourceGroupName rg -DeploymentName deployment } | Should -Throw '*has not succeeded*'
+        Mock az {
+            $global:LASTEXITCODE = 0
+            if ($args[1] -eq 'operation') { '[{"target":"/resources/sql-server","error":{"code":"InvalidParameterValue","message":"Invalid value given for parameter Login."}}]' }
+            else { '{"provisioningState":"Failed","outputs":{}}' }
+        }
+        { & $reader -ResourceGroupName rg -DeploymentName deployment } | Should -Throw '*deployment*rg*state: Failed*/resources/sql-server*InvalidParameterValue*Invalid value given for parameter Login*'
     }
 }
 
@@ -281,6 +285,16 @@ Describe 'Deployment scripts' {
 }
 
 Describe 'Root setup orchestration' {
+    It 'validates the SQL administrator security group in the workload tenant' {
+        $ast = [System.Management.Automation.Language.Parser]::ParseFile($initializer, [ref]$null, [ref]$null)
+        $definition = $ast.Find({ param($node) $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq 'Confirm-SqlAdministratorGroup' }, $true)
+        Invoke-Expression $definition.Extent.Text
+        Mock Get-AzContext { [pscustomobject]@{ Tenant = [pscustomobject]@{ Id = 'tenant' } } }
+        Mock Get-AzADGroup { [pscustomobject]@{ SecurityEnabled = $true } }
+        { Confirm-SqlAdministratorGroup -ObjectId '11111111-1111-1111-1111-111111111111' -TenantId 'tenant' } | Should -Not -Throw
+        Mock Get-AzADGroup { [pscustomobject]@{ SecurityEnabled = $false } }
+        { Confirm-SqlAdministratorGroup -ObjectId '11111111-1111-1111-1111-111111111111' -TenantId 'tenant' } | Should -Throw '*existing security group*'
+    }
     It 'ships a root launcher and optional development helper with the copy bundle' {
         $launcher = Join-Path $PSScriptRoot '..\..\Initialize-Installation.ps1'
         Test-Path $launcher | Should -BeTrue

@@ -48,6 +48,9 @@ Existing client secrets are reused, never silently rotated; missing values are p
 GitHub environment protections are preserved. Setup performs no commits, pushes or destructive resets.
 The setup-selected `SQL_SERVER_AUTHENTICATION` secret selects owned-server creation policy without
 allowing conversions, and the explicit administrator-group secret takes precedence over YAML.
+For Entra-only, Prepare validates that the specified group exists and is security-enabled in the
+workload tenant. IaC reconciles it on existing workload-owned servers, potentially replacing the
+current administrator; review what-if. Referenced servers are not modified.
 
 ```powershell
 ./Initialize-Installation.ps1 -Mode Local
