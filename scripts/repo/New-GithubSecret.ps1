@@ -23,7 +23,7 @@ Secret values are sent to gh on stdin, never on the command line.
 
 .EXAMPLE
 # Set many secrets at once in one repo environment:
-.\New-GithubSecret.ps1 -Owner your-github-handle -Repo your-repo -Environment development -Secrets @{API_CLIENT_ID="your-api-client-id";AZURE_CLIENT_ID="your-azure-client-id";AZURE_OPENAI_APIKEY="your-azure-openai-apikey";AZURE_OPENAI_ENDPOINT="your-azure-openai-endpoint";AZURE_SUBSCRIPTION_ID="your-azure-subscription-id";AZURE_TENANT_ID="your-azure-tenant-id";E2E_CLIENT_ID="your-e2e-client-id";E2E_CLIENT_SECRET="your-e2e-client-secret";EEID_INSTANCE="your-eeid-instance-url";EEID_TENANT_ID="your-eeid-tenant-id";SQL_ADMIN_PASSWORD="your-sql-admin-password";SQL_ADMIN_USER="your-sql-admin-user";WEB_CLIENT_ID="your-web-client-id";WEB_CLIENT_SECRET="your-web-client-secret"}
+.\New-GithubSecret.ps1 -Owner your-github-handle -Repo your-repo -Environment development -Secrets @{API_CLIENT_ID="your-api-client-id";AZURE_CLIENT_ID="your-azure-client-id";AZURE_OPENAI_APIKEY="your-azure-openai-apikey";AZURE_OPENAI_ENDPOINT="your-azure-openai-endpoint";AZURE_SUBSCRIPTION_ID="your-azure-subscription-id";AZURE_TENANT_ID="your-azure-tenant-id";E2E_CLIENT_ID="your-e2e-client-id";E2E_CLIENT_SECRET="your-e2e-client-secret";EEID_INSTANCE="your-eeid-instance-url";EEID_TENANT_ID="your-eeid-tenant-id";WEB_CLIENT_ID="your-web-client-id";WEB_CLIENT_SECRET="your-web-client-secret"}
 #>
 [CmdletBinding(SupportsShouldProcess = $true, DefaultParameterSetName = 'Single')]
 param(
