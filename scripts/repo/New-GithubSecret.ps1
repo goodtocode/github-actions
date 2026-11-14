@@ -5,7 +5,7 @@ Creates or updates (upserts) GitHub Actions secrets in one repo, several repos, 
 .DESCRIPTION
 Requires GitHub CLI (gh) and an authenticated session. Installs GitHub CLI if it is not present and prompts for GitHub authentication if not already authenticated.
 A secret that already exists is overwritten, so rerunning is safe and rotates the value.
-Without -Environment the secrets are repository secrets. With -Environment they are environment secrets, and an environment that does not exist in a repo is skipped with a warning.
+Without -Environment the secrets are repository secrets. With -Environment they are environment secrets. Inaccessible targets and failed uploads fail the script.
 -AllRepos targets every non-archived, non-fork repo of -Owner. Use -WhatIf to list what would be set without changing anything.
 Secret values are sent to gh on stdin, never on the command line.
 
@@ -41,6 +41,14 @@ $ErrorActionPreference = 'Stop'
 if (-not $AllRepos -and -not $Repo) { throw 'Specify -Repo <name,...> or -AllRepos.' }
 if ($AllRepos -and $Repo) { throw 'Use either -Repo or -AllRepos, not both.' }
 
+if ($PSCmdlet.ParameterSetName -eq 'Single') { $Secrets = @{ $SecretName = $SecretValue } }
+if ($Secrets.Count -eq 0) { throw 'Specify at least one secret to upload.' }
+foreach ($name in $Secrets.Keys) {
+  if ([string]::IsNullOrWhiteSpace([string]$name) -or [string]::IsNullOrWhiteSpace([string]$Secrets[$name])) {
+    throw 'Secret names and values must be nonempty. No secrets were uploaded.'
+  }
+}
+
 if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
   Write-Host "GitHub CLI not found. Installing via winget..." -ForegroundColor Red
   winget install --id GitHub.cli -e --silent
@@ -52,9 +60,8 @@ gh auth status 2>$null | Out-Null
 if ($LASTEXITCODE -ne 0) {
   Write-Host "GitHub CLI not authenticated. Please login." -ForegroundColor Red
   gh auth login
+  if ($LASTEXITCODE -ne 0) { throw 'GitHub authentication failed. No secrets were uploaded.' }
 }
-
-if ($PSCmdlet.ParameterSetName -eq 'Single') { $Secrets = @{ $SecretName = $SecretValue } }
 
 if ($AllRepos) {
   Write-Host "Listing repos of $Owner..."
@@ -106,4 +113,6 @@ foreach ($r in $Repo) {
 }
 
 Write-Host "Done. Set: $set, skipped: $skipped, failed: $failed."
-if ($failed -gt 0) { exit 1 }
+if ($failed -gt 0 -or $skipped -gt 0) {
+  throw "GitHub secret upload incomplete. Set: $set, skipped: $skipped, failed: $failed."
+}

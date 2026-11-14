@@ -240,6 +240,10 @@ $secrets.GetEnumerator() | ForEach-Object {
 
 To upsert one secret across several repos or every repo of an owner (existing values are overwritten), use `-Repo a,b` or `-AllRepos`, add `-Environment development,production` for environment secrets, and preview with `-WhatIf`:
 
+The uploader rejects empty values and fails if authentication, any target lookup, or any upload
+fails. Skipped repositories/environments are reported as failures, not successful setup.
+Values are passed to GitHub CLI through stdin rather than command-line arguments.
+
 ```powershell
 ./.github/scripts/repo/New-GithubSecret.ps1 -Owner <github-org-or-user> -AllRepos -Environment development,production -SecretName AZURE_OPENAI_APIKEY -SecretValue "<value>" -WhatIf
 ```
