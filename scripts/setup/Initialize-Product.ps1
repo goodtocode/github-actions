@@ -9,6 +9,8 @@ No commits, pushes, resource deletion, or authentication-mode conversion are per
 [CmdletBinding()]
 param(
     [Parameter(Mandatory)][string]$RepositoryRoot,
+    [Parameter(Mandatory)][ValidatePattern('^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*$')][string]$CompanyName,
+    [Parameter(Mandatory)][ValidatePattern('^[A-Za-z_][A-Za-z0-9_]*$')][string]$ProductName,
     [ValidateSet('Local', 'Cloud', 'Both')][string]$Mode = 'Local',
     [ValidateSet('Prepare', 'Complete', 'Check')][string]$Stage = 'Prepare',
     [ValidateSet('development', 'production')][string]$Environment = 'development',
@@ -35,10 +37,11 @@ $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $false
 $RepositoryRoot = (Resolve-Path -LiteralPath $RepositoryRoot).Path
 if ($Mode -eq 'Local' -and $Stage -eq 'Complete') { throw 'Local mode uses Prepare or Check, not Complete.' }
-$product = if (Test-Path "$RepositoryRoot/Censic.Crucible.slnx") { 'crucible' }
-    elseif (Test-Path "$RepositoryRoot/Censic.Compass.Web.slnx") { 'compass' }
-    elseif (Test-Path "$RepositoryRoot/Goodtocode.AgentFramework.Web.slnx") { 'agent' }
-    else { throw 'No supported product solution found at RepositoryRoot.' }
+$product = $ProductName.ToLowerInvariant()
+$solutionPrefix = "$CompanyName.$ProductName"
+if (-not (Get-ChildItem -LiteralPath $RepositoryRoot -Filter '*.slnx' -File | Where-Object {
+    $_.BaseName -eq $solutionPrefix -or $_.BaseName.StartsWith("$solutionPrefix.", [StringComparison]::OrdinalIgnoreCase)
+})) { throw "No solution found for $solutionPrefix at RepositoryRoot." }
 $apiProject = "$RepositoryRoot/src/Presentation.Api/Presentation.Api.csproj"
 $webProject = "$RepositoryRoot/src/Presentation.Web/Presentation.Web.csproj"
 $e2eProject = "$RepositoryRoot/src/Tests.Endtoend.Api/Tests.Endtoend.Api.csproj"
@@ -169,7 +172,7 @@ try {
         }
 
         if ($Mode -ne 'Cloud') {
-            $database = if ($product -eq 'crucible') { 'Crucible' } else { 'AgentFramework' }
+            $database = $ProductName
             $localConnection = "Server=(localdb)\MSSQLLocalDB;Database=$database;Integrated Security=True;Encrypt=True;TrustServerCertificate=True"
             Save-Settings $apiProject @{ 'ConnectionStrings:DefaultConnection' = $localConnection }
             if (-not $SkipDatabase) {

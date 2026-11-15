@@ -19,7 +19,7 @@ Secret values are sent to gh on stdin, never on the command line.
 
 .EXAMPLE
 # Upsert one secret in a list of repos, as repository secrets:
-.\New-GithubSecret.ps1 -Owner censicai -Repo crucible,compass -SecretName AZURE_OPENAI_ENDPOINT -SecretValue "https://ai-dev-wus2-100-aif.openai.azure.com/"
+.\New-GithubSecret.ps1 -Owner contoso -Repo assist,portal -SecretName AZURE_OPENAI_ENDPOINT -SecretValue "https://example.openai.azure.com/"
 
 .EXAMPLE
 # Set many secrets at once in one repo environment:

@@ -27,7 +27,7 @@ Workflows are named after the `.azure` templates they deploy: `{platform|workloa
 | `platform-hub-iac.yml`, `platform-spoke-iac.yml` | Phase 3 and 4 hub and spoke network |
 | `package-nuget.yml` | Build, test, and publish NuGet packages |
 
-Consumer repos rename `workload-digitalproduct-*` to the product name, for example `crucible-iac.yml` and `crucible-app.yml`.
+Consumer repos rename `workload-digitalproduct-*` to the product name, for example `example-iac.yml` and `example-app.yml`.
 
 ### Root Setup
 
@@ -53,17 +53,18 @@ workload tenant. IaC reconciles it on existing workload-owned servers, potential
 current administrator; review what-if. Referenced servers are not modified.
 
 ```powershell
-./Initialize-Installation.ps1 -Mode Local
-./Initialize-Installation.ps1 -Mode Cloud -SqlAuthentication SqlAuth
+./Initialize-Installation.ps1 -CompanyName Contoso -ProductName Example -Mode Local
+./Initialize-Installation.ps1 -CompanyName Contoso -ProductName Example -Mode Cloud -SqlAuthentication SqlAuth
 # Review and run the product IaC workflow, then resume:
-./Initialize-Installation.ps1 -Mode Cloud -Stage Complete
+./Initialize-Installation.ps1 -CompanyName Contoso -ProductName Example -Mode Cloud -Stage Complete
 ```
 
-The optional `scripts/setup/Initialize-Development.ps1` retains AFQS's advanced local-only
+The optional `scripts/setup/Initialize-Development.ps1` retains advanced local-only
 options for deployment-name overrides, telemetry and an explicit local connection string.
 It is copied to `.github/scripts/setup/`; the installation launcher remains the primary entry point.
-The installer currently recognizes the Crucible, Compass and AFQS solution layouts. Other layouts
-must adapt product/project discovery rather than assuming that copying the launcher alone configures them.
+Both company and product names are required. The installer expects a solution named
+`Company.Product.slnx` or `Company.Product.*.slnx` and the documented project layout;
+other layouts must adapt discovery. Local database naming uses the product name.
 
 ### Digital-product SQL/identity contract
 
