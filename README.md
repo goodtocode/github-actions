@@ -45,7 +45,12 @@ then exits so the operator can review/publish and run product IaC. Cloud Complet
 deployment, adds hosted redirects, refreshes local telemetry and runs Entra SQL user provisioning
 as the authorized signed-in administrator. SQL-auth access is provisioned by the pipelines.
 Existing client secrets are reused, never silently rotated; missing values are prompted securely.
-GitHub environment protections are preserved. Setup performs no commits, pushes or destructive resets.
+Cloud Prepare and `scripts/repo/New-GithubRepoBootstrap.ps1` ensure development and production
+exist. If production has no required reviewer, the authenticated GitHub user is added; existing
+reviewers and other supported protections are preserved. Private repositories require GitHub
+Enterprise for required reviewers. Repository administrators can bypass approval if the
+environment permits it; configure that setting in GitHub as needed. Setup fails if it cannot
+verify the plan or preserve existing protection. Setup performs no commits, pushes or destructive resets.
 The setup-selected `SQL_SERVER_AUTHENTICATION` secret selects owned-server creation policy without
 allowing conversions, and the explicit administrator-group secret takes precedence over YAML.
 For Entra-only, Prepare validates that the specified group exists and is security-enabled in the

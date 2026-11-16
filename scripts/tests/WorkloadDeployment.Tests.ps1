@@ -309,10 +309,10 @@ Describe 'Root setup orchestration' {
 
     BeforeEach {
         $script:setupRoot = Join-Path $TestDrive ([guid]::NewGuid().ToString('N'))
-        foreach ($directory in @('src/Presentation.Api', 'src/Presentation.Web', '.azure/scripts', '.github/scripts/cd')) {
+        foreach ($directory in @('src/Presentation.Api', 'src/Presentation.Web', '.azure/scripts', '.github/scripts/cd', '.github/scripts/repo')) {
             New-Item -ItemType Directory -Path (Join-Path $setupRoot $directory) -Force | Out-Null
         }
-        foreach ($file in @('src/Presentation.Api/Presentation.Api.csproj', 'src/Presentation.Web/Presentation.Web.csproj', '.azure/scripts/New-EntraDotnetSolution.ps1', '.github/scripts/cd/New-Github-Azure-Federation.ps1')) {
+        foreach ($file in @('src/Presentation.Api/Presentation.Api.csproj', 'src/Presentation.Web/Presentation.Web.csproj', '.azure/scripts/New-EntraDotnetSolution.ps1', '.github/scripts/cd/New-Github-Azure-Federation.ps1', '.github/scripts/repo/Set-GithubDeploymentEnvironments.ps1')) {
             Set-Content (Join-Path $setupRoot $file) 'synthetic setup fixture'
         }
         Mock Get-Command { [pscustomobject]@{ Name = 'Available' } } -ParameterFilter { ($Name -join ',') -in @('dotnet', 'git', 'az', 'gh') }
@@ -379,7 +379,7 @@ Describe 'Root setup orchestration' {
         $source = Get-Content $initializer -Raw
         $source.IndexOf('Get-WorkloadDeployment.ps1') | Should -BeLessThan $source.IndexOf('Set-AzureSqlManagedIdentityUsers.ps1')
         $source | Should -Match 'Setup:\$\{Environment\}:\$\{Instance\}'
-        $source | Should -Match 'Existing protection settings were not changed'
+        $source | Should -Match 'Set-GithubDeploymentEnvironments.ps1'
         $source | Should -Not -Match 'git (commit|push)|Remove-AzSql|DROP DATABASE'
     }
 }
