@@ -320,40 +320,47 @@ Describe 'Root setup orchestration' {
         Mock dotnet { throw 'Preflight must not change projects.' }
     }
 
-    It 'discovers each supported product without changing configuration' -ForEach @(
-        @{ Solution = 'Censic.Crucible.slnx'; Product = 'crucible' },
-        @{ Solution = 'Censic.Compass.Web.slnx'; Product = 'compass' },
-        @{ Solution = 'Goodtocode.AgentFramework.Web.slnx'; Product = 'agent' }
+    It 'discovers the named product without changing configuration' -ForEach @(
+        @{ Solution = 'Contoso.Example.slnx'; Product = 'Example' },
+        @{ Solution = 'Fabrikam.Sample.Web.slnx'; Product = 'Sample' }
     ) {
         Set-Content (Join-Path $setupRoot $Solution) 'synthetic solution fixture'
-        $output = & $initializer -RepositoryRoot $setupRoot -Mode Both -Stage Check 6>&1
-        ($output | Out-String) | Should -Match "verified for $Product"
+        $company = $Solution.Split('.')[0]
+        $output = & $initializer -RepositoryRoot $setupRoot -CompanyName $company -ProductName $Product -Mode Both -Stage Check 6>&1
+        ($output | Out-String) | Should -Match "verified for $($Product.ToLowerInvariant())"
         Should -Invoke Read-Host -Times 0 -Exactly
         Should -Invoke dotnet -Times 0 -Exactly
     }
 
     It 'runs the copied root launcher with the copied helper in a consuming repository' {
-        Set-Content (Join-Path $setupRoot 'Goodtocode.AgentFramework.Web.slnx') 'synthetic solution fixture'
+        Set-Content (Join-Path $setupRoot 'Contoso.Example.Web.slnx') 'synthetic solution fixture'
         $folder = Join-Path $setupRoot '.github/scripts/setup'
         New-Item -ItemType Directory $folder -Force | Out-Null
         Copy-Item $initializer (Join-Path $folder 'Initialize-Product.ps1')
         $launcher = Join-Path $setupRoot 'Initialize-Installation.ps1'
         Copy-Item (Join-Path $PSScriptRoot '..\..\Initialize-Installation.ps1') $launcher
-        $output = & $launcher -Mode Local -Stage Check 6>&1
-        ($output | Out-String) | Should -Match 'verified for agent'
+        $output = & $launcher -CompanyName Contoso -ProductName Example -Mode Local -Stage Check 6>&1
+        ($output | Out-String) | Should -Match 'verified for example'
         Should -Invoke Read-Host -Times 0 -Exactly
         Should -Invoke dotnet -Times 0 -Exactly
     }
 
     It 'rejects local Complete before prompting or accessing credentials' {
-        { & $initializer -RepositoryRoot $setupRoot -Mode Local -Stage Complete } | Should -Throw '*Local mode uses Prepare or Check*'
+        { & $initializer -RepositoryRoot $setupRoot -CompanyName Contoso -ProductName Example -Mode Local -Stage Complete } | Should -Throw '*Local mode uses Prepare or Check*'
         Should -Invoke Read-Host -Times 0 -Exactly
     }
 
+    It 'rejects a solution for a different product before configuration' {
+        Set-Content (Join-Path $setupRoot 'Contoso.Other.slnx') 'synthetic solution fixture'
+        { & $initializer -RepositoryRoot $setupRoot -CompanyName Contoso -ProductName Example -Stage Check } | Should -Throw '*No solution found for Contoso.Example*'
+        Should -Invoke Read-Host -Times 0 -Exactly
+        Should -Invoke dotnet -Times 0 -Exactly
+    }
+
     It 'does not install missing prerequisites in Check mode' {
-        Set-Content (Join-Path $setupRoot 'Censic.Crucible.slnx') 'synthetic solution fixture'
+        Set-Content (Join-Path $setupRoot 'Contoso.Example.slnx') 'synthetic solution fixture'
         Mock Get-Command { $null } -ParameterFilter { ($Name -join ',') -eq 'dotnet' }
-        { & $initializer -RepositoryRoot $setupRoot -Mode Local -Stage Check -InstallPrerequisites } | Should -Throw '*Install dotnet*'
+        { & $initializer -RepositoryRoot $setupRoot -CompanyName Contoso -ProductName Example -Mode Local -Stage Check -InstallPrerequisites } | Should -Throw '*Install dotnet*'
         Should -Invoke dotnet -Times 0 -Exactly
     }
 
