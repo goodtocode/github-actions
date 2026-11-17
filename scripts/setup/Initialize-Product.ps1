@@ -49,6 +49,9 @@ if (-not (Test-Path $e2eProject)) { $e2eProject = '' }
 foreach ($path in @($apiProject, $webProject, "$RepositoryRoot/.azure/scripts/New-EntraDotnetSolution.ps1", "$RepositoryRoot/.github/scripts/cd/New-Github-Azure-Federation.ps1")) {
     if (-not (Test-Path -LiteralPath $path)) { throw "Required setup file is missing: $path" }
 }
+if ($Mode -ne 'Local' -and -not (Test-Path -LiteralPath "$RepositoryRoot/.github/scripts/repo/Set-GithubDeploymentEnvironments.ps1")) {
+    throw 'Required GitHub deployment environment helper is missing.'
+}
 $short = if ($Environment -eq 'production') { 'prod' } else { 'dev' }
 $setupPrefix = "Setup:${Environment}:${Instance}"
 $tools = @{ dotnet = 'Microsoft.DotNet.SDK.10'; git = 'Git.Git' }
@@ -224,12 +227,7 @@ try {
         Write-Host 'Repository created. Publish the reviewed source and workflows yourself; setup never commits or pushes.'
     }
     if ($Stage -eq 'Prepare') {
-        $environmentLookup = gh api "repos/$repository/environments/$Environment" 2>&1
-        if ($LASTEXITCODE -ne 0) {
-            if (($environmentLookup -join ' ') -notmatch 'HTTP 404') { throw 'GitHub environment lookup failed. Existing protection settings were not changed.' }
-            gh api --method PUT "repos/$repository/environments/$Environment" | Out-Null
-            if ($LASTEXITCODE -ne 0) { throw 'GitHub environment creation failed.' }
-        }
+        & "$RepositoryRoot/.github/scripts/repo/Set-GithubDeploymentEnvironments.ps1" -Owner $GitHubOwner -Repo $GitHubRepository
         $federation = @(& "$RepositoryRoot/.github/scripts/cd/New-Github-Azure-Federation.ps1" -TenantId $WorkloadTenantId -SubscriptionId $SubscriptionId -PrincipalName $GitHubPrincipalName -Organization $GitHubOwner -Repository $GitHubRepository -Environment $Environment -PassThru) | Where-Object { $_ -and $_.PSObject.Properties['ClientId'] } | Select-Object -Last 1
         if (-not $federation) { throw 'Federation setup did not return its structured client ID.' }
         $apiValues = Get-DotnetUserSecrets $apiProject

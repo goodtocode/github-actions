@@ -213,42 +213,8 @@ if ($repoExists) {
 }
 # Ref: https://docs.github.com/en/rest/branches/rulesets?apiVersion=2022-11-28
 
-# ---- 6) Create Environments: development & production
-# (You can set branch policy + required reviewers)
-# Create/Update Environment (PUT) + optional deployment branch policy & protection rules
-# Note: required_reviewers require usernames or team slugs (max 6). [7](https://docs.github.com/en/rest/deployments/environments)[12](https://docs.github.com/en/actions/reference/workflows-and-actions/deployments-and-environments)
-
-# development
-if ($repoExists) {
-  Write-Host "Checking if development environment exists..."
-  $devEnvResponse = gh api "repos/$Owner/$Repo/environments/development" 2>&1
-  if ($devEnvResponse -match '"Not Found"' -or $devEnvResponse -match '404') {
-    Write-Host "Development environment does not exist. Creating..."
-    gh api -X PUT "repos/$Owner/$Repo/environments/development" `
-      -H "Accept: application/vnd.github+json" | Out-Null
-    Write-Host "Development environment created."
-  }
-  else {
-    Write-Host "Development environment already exists. Skipping."
-  }
-}
-# Optionally add a custom branch policy pattern for dev (requires extra POST endpoint under env policies).
-# See community examples for adding custom branch policies after creation. [13](https://stackoverflow.com/questions/70943164/create-environment-for-repository-using-gh)
-
-# NOTE: Replace reviewers with concrete users/teams via separate calls if needed.
-if ($repoExists) {
-  Write-Host "Checking if production environment exists..."
-  $prodEnvResponse = gh api "repos/$Owner/$Repo/environments/production" 2>&1
-  if ($prodEnvResponse -match '"Not Found"' -or $prodEnvResponse -match '404') {
-    Write-Host "Production environment does not exist. Creating..."
-    gh api -X PUT "repos/$Owner/$Repo/environments/production" `
-      -H "Accept: application/vnd.github+json" | Out-Null
-    Write-Host "Production environment created."
-  }
-  else {
-    Write-Host "Production environment already exists. Skipping."
-  }
-}
-# Ref: Environments API supports branch policy and protection rules. [7](https://docs.github.com/en/rest/deployments/environments)
+# ---- 6) Create development and ensure production has a required reviewer.
+if (-not $repoExists) { throw "Repository $Owner/$Repo is missing or inaccessible." }
+& "$PSScriptRoot/Set-GithubDeploymentEnvironments.ps1" -Owner $Owner -Repo $Repo
 
 Write-Host "✅ Bootstrap completed for $Owner/$Repo"
