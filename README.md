@@ -44,7 +44,15 @@ user-secrets and existing local migrations. Cloud Prepare ensures federation/env
 then exits so the operator can review/publish and run product IaC. Cloud Complete verifies the named
 deployment, adds hosted redirects, refreshes local telemetry and runs Entra SQL user provisioning
 as the authorized signed-in administrator. SQL-auth access is provisioned by the pipelines.
-Existing client secrets are reused, never silently rotated; missing values are prompted securely.
+Existing client secrets are reused; missing or mismatched registration credentials are repaired
+additively and affected GitHub secrets updated. Unrelated existing GitHub secrets are preserved.
+Setup state is stored in a dedicated local user-secrets store through the IaC checkpoint and on
+failure. Successful Local Prepare or Cloud Complete removes only the active session's entries.
+Existing `Setup:*` entries in application stores are left untouched for manual cleanup. Runtime
+credentials remain in their owning project stores; user-secrets are unencrypted and must not be
+printed or committed.
+The generic initializer does not copy E2E credentials into arbitrary `Setup.*` projects;
+configure authentication explicitly for each setup process that needs it.
 Cloud Prepare and `scripts/repo/New-GithubRepoBootstrap.ps1` ensure development and production
 exist. If production has no required reviewer, the authenticated GitHub user is added; existing
 reviewers and other supported protections are preserved. Private repositories require GitHub

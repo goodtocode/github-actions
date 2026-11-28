@@ -46,14 +46,13 @@ $apiProject = "$RepositoryRoot/src/Presentation.Api/Presentation.Api.csproj"
 $webProject = "$RepositoryRoot/src/Presentation.Web/Presentation.Web.csproj"
 $e2eProject = "$RepositoryRoot/src/Tests.Endtoend.Api/Tests.Endtoend.Api.csproj"
 if (-not (Test-Path $e2eProject)) { $e2eProject = '' }
-foreach ($path in @($apiProject, $webProject, "$RepositoryRoot/.azure/scripts/New-EntraDotnetSolution.ps1", "$RepositoryRoot/.github/scripts/cd/New-Github-Azure-Federation.ps1")) {
+foreach ($path in @($apiProject, $webProject, "$PSScriptRoot/Setup-Session.ps1", "$RepositoryRoot/.azure/scripts/New-EntraDotnetSolution.ps1", "$RepositoryRoot/.github/scripts/cd/New-Github-Azure-Federation.ps1")) {
     if (-not (Test-Path -LiteralPath $path)) { throw "Required setup file is missing: $path" }
 }
 if ($Mode -ne 'Local' -and -not (Test-Path -LiteralPath "$RepositoryRoot/.github/scripts/repo/Set-GithubDeploymentEnvironments.ps1")) {
     throw 'Required GitHub deployment environment helper is missing.'
 }
 $short = if ($Environment -eq 'production') { 'prod' } else { 'dev' }
-$setupPrefix = "Setup:${Environment}:${Instance}"
 $tools = @{ dotnet = 'Microsoft.DotNet.SDK.10'; git = 'Git.Git' }
 if ($Mode -ne 'Local') { $tools.az = 'Microsoft.AzureCLI'; $tools.gh = 'GitHub.cli' }
 foreach ($tool in $tools.Keys) {
@@ -70,14 +69,22 @@ if ($Stage -eq 'Check') {
 }
 
 . "$RepositoryRoot/.azure/scripts/lib/Dotnet.Common.ps1"
+. "$PSScriptRoot/Setup-Session.ps1"
+Start-SetupSession -RepositoryRoot $RepositoryRoot -CompanyName $CompanyName -ProductName $ProductName -Environment $Environment -Instance $Instance
+if (-not $PSBoundParameters.ContainsKey('SqlAuthentication') -and $setupState['SqlAuthentication']) {
+    $SqlAuthentication = [string]$setupState['SqlAuthentication']
+}
+Save-SetupValue 'SqlAuthentication' $SqlAuthentication
 $apiValues = Get-DotnetUserSecrets -ProjectPath $apiProject
 function Read-Setting([string]$Name, [string]$Value, [string]$Default = '') {
-    if ($Value) { return $Value }
-    if ($apiValues["${setupPrefix}:$Name"]) { return [string]$apiValues["${setupPrefix}:$Name"] }
-    $answer = Read-Host "$Name$(if ($Default) { " [$Default]" })"
-    if (-not $answer) { $answer = $Default }
-    if (-not $answer) { throw "$Name is required." }
-    return $answer
+    if (-not $Value) { $Value = [string]$setupState[$Name] }
+    if (-not $Value) {
+        $Value = Read-Host "$Name$(if ($Default) { " [$Default]" })"
+        if (-not $Value) { $Value = $Default }
+    }
+    if (-not $Value) { throw "$Name is required." }
+    Save-SetupValue $Name $Value
+    return $Value
 }
 function Read-PrivateSetting([string]$Name, [hashtable]$Values, [string]$Key) {
     if ($Values[$Key]) { return [string]$Values[$Key] }
@@ -98,6 +105,82 @@ function Confirm-SqlAdministratorGroup([string]$ObjectId, [string]$TenantId) {
 }
 function Save-Settings([string]$Project, [hashtable]$Values) {
     if (-not (Set-DotnetUserSecrets -ProjectPath $Project -Secrets $Values)) { throw 'Setup could not persist configuration. No credentials will be printed.' }
+}
+function Invoke-SetupRegistrations {
+    $previousApi = Get-DotnetUserSecrets $apiProject
+    $previous = @{}
+    foreach ($project in @($webProject, $e2eProject) | Where-Object { $_ }) {
+        $previous[$project] = Get-DotnetUserSecrets $project
+    }
+    try {
+        & "$RepositoryRoot/.azure/scripts/New-EntraDotnetSolution.ps1" @registrationArguments | Out-Null
+    }
+    finally {
+      $currentApi = Get-DotnetUserSecrets $apiProject
+      if ($currentApi['EntraExternalId:ClientId'] -and $currentApi['EntraExternalId:ClientId'] -ne $previousApi['EntraExternalId:ClientId']) {
+          Save-SetupValue 'ApiRegistrationChanged' 'true'
+      }
+      if (($currentApi['EntraExternalId:TenantId'] -and $currentApi['EntraExternalId:TenantId'] -ne $previousApi['EntraExternalId:TenantId']) -or
+          ($currentApi['EntraExternalId:Instance'] -and $currentApi['EntraExternalId:Instance'] -ne $previousApi['EntraExternalId:Instance'])) {
+          Save-SetupValue 'SignInConfigurationChanged' 'true'
+      }
+      foreach ($project in $previous.Keys) {
+        $current = Get-DotnetUserSecrets $project
+        $old = $previous[$project]
+        $clientId = [string]$current['EntraExternalId:ClientId']
+        if (-not $clientId) { throw 'Registration did not persist its client ID.' }
+        $kind = if ($project -eq $webProject) { 'Web' } else { 'E2E' }
+        $changed = $clientId -ne $old['EntraExternalId:ClientId'] -or
+            ($old['EntraExternalId:TenantId'] -and $current['EntraExternalId:TenantId'] -ne $old['EntraExternalId:TenantId'])
+        $stale = $changed -and $current['EntraExternalId:ClientSecret'] -and
+            $current['EntraExternalId:ClientSecret'] -ceq $old['EntraExternalId:ClientSecret']
+        $repairKey = "${kind}RepairClientId"
+        if ($stale -or -not $current['EntraExternalId:ClientSecret'] -or $setupState[$repairKey] -eq $clientId) {
+            Save-SetupValue $repairKey $clientId
+            Save-SetupValue "${kind}CredentialsChanged" 'true'
+            $credentialKey = "${kind}Credential:$clientId"
+            $credential = [string]$setupState[$credentialKey]
+            if (-not $credential) {
+                $arguments = @{
+                    Type = $kind
+                    TenantId = $SignInTenantId
+                    AppRegistrationName = $registrationArguments["${kind}AppRegistrationName"]
+                    SecretOnly = $true
+                    SkipPrerequisites = $true
+                    ProjectName = (Get-DotnetProjectName $project)
+                }
+                if ($kind -eq 'E2E') { $arguments.ApiAppId = (Get-DotnetUserSecrets $apiProject)['EntraExternalId:ClientId'] }
+                $result = @(& "$RepositoryRoot/.azure/scripts/entra/New-EntraAppRegistration.ps1" @arguments) |
+                    Where-Object { $_ -and $_.PSObject.Properties['AppId'] } | Select-Object -Last 1
+                if (-not $result -or $result.AppId -ne $clientId -or -not $result.Secret) {
+                    throw "Unable to generate a credential for the reconciled $kind registration."
+                }
+                $credential = [string]$result.Secret
+                Save-SetupValue $credentialKey $credential
+            }
+            Save-Settings $project @{ 'EntraExternalId:ClientSecret' = $credential }
+            $current['EntraExternalId:ClientSecret'] = $credential
+            Save-SetupValue $repairKey 'none'
+        }
+        if ($changed -or $current['EntraExternalId:ClientSecret'] -cne $old['EntraExternalId:ClientSecret']) {
+            Save-SetupValue "${kind}CredentialsChanged" 'true'
+        }
+      }
+    }
+}
+function Get-GitHubSecretNames([string]$Repository, [string]$TargetEnvironment) {
+    $names = @(gh secret list --repo $Repository --env $TargetEnvironment --json name --jq '.[].name')
+    if ($LASTEXITCODE -ne 0) { throw 'Unable to list existing GitHub environment secrets.' }
+    return $names
+}
+function Publish-SetupSecrets([hashtable]$Values, [string[]]$Existing, [string[]]$Changed) {
+    $pending = @{}
+    foreach ($name in $Values.Keys) {
+        if ($name -notin $Existing -or $name -in $Changed) { $pending[$name] = $Values[$name] }
+    }
+    if ($pending.Count -gt 0) {
+        & "$RepositoryRoot/.github/scripts/repo/New-GithubSecret.ps1" -Owner $GitHubOwner -Repo $GitHubRepository -Environment $Environment -Secrets $pending
+    }
 }
 function Get-LocalUrl([string]$Project) {
     $launch = Get-Content (Join-Path (Split-Path $Project) 'Properties/launchSettings.json') -Raw | ConvertFrom-Json
@@ -138,34 +221,14 @@ Push-Location $RepositoryRoot
 try {
     if ($Stage -eq 'Prepare') {
         Write-Host 'Preparing sign-in registrations and local configuration.'
-        $previousWebValues = Get-DotnetUserSecrets $webProject
-        if ($previousWebValues['EntraExternalId:ClientSecret'] -and -not $previousWebValues['Setup:SecretClientId']) {
-            Save-Settings $webProject @{ 'Setup:SecretClientId' = $previousWebValues['EntraExternalId:ClientId'] }
-        }
-        $previousE2eValues = @{}
-        if ($e2eProject) {
-            $previousE2eValues = Get-DotnetUserSecrets $e2eProject
-            if ($previousE2eValues['EntraExternalId:ClientSecret'] -and -not $previousE2eValues['Setup:SecretClientId']) {
-                Save-Settings $e2eProject @{ 'Setup:SecretClientId' = $previousE2eValues['EntraExternalId:ClientId'] }
-            }
-        }
-        & "$RepositoryRoot/.azure/scripts/New-EntraDotnetSolution.ps1" @registrationArguments | Out-Null
+        Invoke-SetupRegistrations
         $apiValues = Get-DotnetUserSecrets $apiProject
         $webValues = Get-DotnetUserSecrets $webProject
-        if ($webValues['Setup:SecretClientId'] -ne $webValues['EntraExternalId:ClientId'] -and $webValues['EntraExternalId:ClientSecret'] -eq $previousWebValues['EntraExternalId:ClientSecret']) {
-            $webValues.Remove('EntraExternalId:ClientSecret')
-        }
-        Save-Settings $webProject @{ 'EntraExternalId:ClientSecret' = (Read-PrivateSetting 'Web client secret (only if missing or for a different registration)' $webValues 'EntraExternalId:ClientSecret'); 'Setup:SecretClientId' = $webValues['EntraExternalId:ClientId'] }
+        Save-Settings $webProject @{ 'EntraExternalId:ClientSecret' = (Read-PrivateSetting 'Web client secret (only if missing or for a different registration)' $webValues 'EntraExternalId:ClientSecret') }
         Save-Settings $webProject @{ 'BackendApi:BaseUrl' = $apiUrl }
         if ($e2eProject) {
             $e2eValues = Get-DotnetUserSecrets $e2eProject
-            if ($e2eValues['Setup:SecretClientId'] -ne $e2eValues['EntraExternalId:ClientId'] -and $e2eValues['EntraExternalId:ClientSecret'] -eq $previousE2eValues['EntraExternalId:ClientSecret']) {
-                $e2eValues.Remove('EntraExternalId:ClientSecret')
-            }
-            Save-Settings $e2eProject @{ 'EntraExternalId:ClientSecret' = (Read-PrivateSetting 'E2E client secret (only if missing or for a different registration)' $e2eValues 'EntraExternalId:ClientSecret'); 'Setup:SecretClientId' = $e2eValues['EntraExternalId:ClientId']; 'BackendApi:BaseUrl' = $apiUrl; 'EntraExternalId:ValidateAuthority' = 'true' }
-            foreach ($project in Get-ChildItem "$RepositoryRoot/src/Setup.*/Setup.*.csproj" -ErrorAction SilentlyContinue) {
-                Save-Settings $project.FullName (Get-DotnetUserSecrets $e2eProject)
-            }
+            Save-Settings $e2eProject @{ 'EntraExternalId:ClientSecret' = (Read-PrivateSetting 'E2E client secret (only if missing or for a different registration)' $e2eValues 'EntraExternalId:ClientSecret'); 'BackendApi:BaseUrl' = $apiUrl; 'EntraExternalId:ValidateAuthority' = 'true' }
         }
         $AzureOpenAIEndpoint = Read-Setting 'AzureOpenAIEndpoint' $AzureOpenAIEndpoint $apiValues['AzureOpenAI:Endpoint']
         Save-Settings $apiProject @{ 'AzureOpenAI:Endpoint' = $AzureOpenAIEndpoint; 'AzureOpenAI:ApiKey' = (Read-PrivateSetting 'Azure OpenAI API key' $apiValues 'AzureOpenAI:ApiKey') }
@@ -203,6 +266,7 @@ try {
     }
     if ($Mode -eq 'Local') {
         if ($Stage -ne 'Prepare') { throw 'Local mode uses Prepare or Check, not Complete.' }
+        Complete-SetupSession
         Write-Host "Local setup complete. API: $apiUrl; Web: $webUrl."
         return
     }
@@ -212,10 +276,10 @@ try {
     $GitHubOwner = Read-Setting 'GitHubOwner' $GitHubOwner
     $GitHubRepository = Read-Setting 'GitHubRepository' $GitHubRepository $product
     if (-not $GitHubPrincipalName) {
-        $GitHubPrincipalName = if ($apiValues["${setupPrefix}:GitHubPrincipalName"]) { [string]$apiValues["${setupPrefix}:GitHubPrincipalName"] } else { "github-$product" }
+        $GitHubPrincipalName = if ($setupState['GitHubPrincipalName']) { [string]$setupState['GitHubPrincipalName'] } else { "github-$product" }
     }
+    Save-SetupValue 'GitHubPrincipalName' $GitHubPrincipalName
     $ResourceGroupName = Read-Setting 'ResourceGroupName' $ResourceGroupName "$product-$short-wus2-$Instance-rg"
-    Save-Settings $apiProject @{ "${setupPrefix}:SignInTenantId" = $SignInTenantId; "${setupPrefix}:SignInInstanceUrl" = $SignInInstanceUrl; "${setupPrefix}:WorkloadTenantId" = $WorkloadTenantId; "${setupPrefix}:SubscriptionId" = $SubscriptionId; "${setupPrefix}:GitHubOwner" = $GitHubOwner; "${setupPrefix}:GitHubRepository" = $GitHubRepository; "${setupPrefix}:GitHubPrincipalName" = $GitHubPrincipalName; "${setupPrefix}:ResourceGroupName" = $ResourceGroupName }
     gh auth status | Out-Null
     if ($LASTEXITCODE -ne 0) { gh auth login; if ($LASTEXITCODE -ne 0) { throw 'GitHub authentication failed.' } }
     $repository = "$GitHubOwner/$GitHubRepository"
@@ -230,6 +294,7 @@ try {
         & "$RepositoryRoot/.github/scripts/repo/Set-GithubDeploymentEnvironments.ps1" -Owner $GitHubOwner -Repo $GitHubRepository
         $federation = @(& "$RepositoryRoot/.github/scripts/cd/New-Github-Azure-Federation.ps1" -TenantId $WorkloadTenantId -SubscriptionId $SubscriptionId -PrincipalName $GitHubPrincipalName -Organization $GitHubOwner -Repository $GitHubRepository -Environment $Environment -PassThru) | Where-Object { $_ -and $_.PSObject.Properties['ClientId'] } | Select-Object -Last 1
         if (-not $federation) { throw 'Federation setup did not return its structured client ID.' }
+        $existingSecrets = @(Get-GitHubSecretNames $repository $Environment)
         $apiValues = Get-DotnetUserSecrets $apiProject
         $webValues = Get-DotnetUserSecrets $webProject
         $secrets = @{
@@ -244,17 +309,35 @@ try {
             $secrets.E2E_CLIENT_ID = $e2eValues['EntraExternalId:ClientId']; $secrets.E2E_CLIENT_SECRET = $e2eValues['EntraExternalId:ClientSecret']
         }
         if ($SqlAuthentication -eq 'SqlAuth') {
-            foreach ($name in @('SQL_ADMIN_USER', 'SQL_MIGRATION_USER')) { $secrets[$name] = Read-Setting $name '' }
-            foreach ($name in @('SQL_ADMIN_PASSWORD', 'SQL_MIGRATION_PASSWORD')) { $secrets[$name] = Read-PrivateSetting $name $apiValues "${setupPrefix}:$name" }
-            Save-Settings $apiProject @{ "${setupPrefix}:SQL_ADMIN_USER" = $secrets.SQL_ADMIN_USER; "${setupPrefix}:SQL_MIGRATION_USER" = $secrets.SQL_MIGRATION_USER; "${setupPrefix}:SQL_ADMIN_PASSWORD" = $secrets.SQL_ADMIN_PASSWORD; "${setupPrefix}:SQL_MIGRATION_PASSWORD" = $secrets.SQL_MIGRATION_PASSWORD }
+            foreach ($name in @('SQL_ADMIN_USER', 'SQL_MIGRATION_USER')) {
+                if ($name -notin $existingSecrets) { $secrets[$name] = Read-Setting $name '' }
+            }
+            foreach ($name in @('SQL_ADMIN_PASSWORD', 'SQL_MIGRATION_PASSWORD')) {
+                if ($name -notin $existingSecrets) {
+                    $secrets[$name] = Read-PrivateSetting $name $setupState $name
+                    Save-SetupValue $name $secrets[$name]
+                }
+            }
         }
         else {
-            $groupObjectId = Read-Setting 'SqlAdministratorGroupObjectId' $SqlAdministratorGroupObjectId
-            Confirm-SqlAdministratorGroup -ObjectId $groupObjectId -TenantId $WorkloadTenantId
-            $secrets.SQL_ENTRA_ADMIN_GROUP_OBJECT_ID = $groupObjectId
+            if ('SQL_ENTRA_ADMIN_GROUP_OBJECT_ID' -notin $existingSecrets -or $SqlAdministratorGroupObjectId) {
+                $groupObjectId = Read-Setting 'SqlAdministratorGroupObjectId' $SqlAdministratorGroupObjectId
+                Confirm-SqlAdministratorGroup -ObjectId $groupObjectId -TenantId $WorkloadTenantId
+                $secrets.SQL_ENTRA_ADMIN_GROUP_OBJECT_ID = $groupObjectId
+            }
         }
-        & "$RepositoryRoot/.github/scripts/repo/New-GithubSecret.ps1" -Owner $GitHubOwner -Repo $GitHubRepository -Environment $Environment -Secrets $secrets
-        if ($LASTEXITCODE -ne 0) { throw 'GitHub secret preparation did not complete successfully. Fix access and rerun Prepare.' }
+        $changed = @()
+        if ($setupState['WebCredentialsChanged'] -eq 'true') { $changed += @('WEB_CLIENT_ID', 'WEB_CLIENT_SECRET') }
+        if ($setupState['E2ECredentialsChanged'] -eq 'true') { $changed += @('E2E_CLIENT_ID', 'E2E_CLIENT_SECRET') }
+        if ($setupState['ApiRegistrationChanged'] -eq 'true') { $changed += 'API_CLIENT_ID' }
+        if ($setupState['SignInConfigurationChanged'] -eq 'true') { $changed += @('EEID_INSTANCE', 'EEID_TENANT_ID') }
+        if ($SqlAdministratorGroupObjectId) { $changed += 'SQL_ENTRA_ADMIN_GROUP_OBJECT_ID' }
+        if ($PSBoundParameters.ContainsKey('SqlAuthentication')) { $changed += 'SQL_SERVER_AUTHENTICATION' }
+        Publish-SetupSecrets $secrets $existingSecrets $changed
+        Save-SetupValue 'WebCredentialsChanged' 'false'
+        if ($e2eProject) { Save-SetupValue 'E2ECredentialsChanged' 'false' }
+        Save-SetupValue 'ApiRegistrationChanged' 'false'
+        Save-SetupValue 'SignInConfigurationChanged' 'false'
         Write-Host "Preparation complete. Review $product-iac.yml naming, parameter-file authentication and shared dependencies; run that workflow with environment=$Environment and runcd=true."
         Write-Host "After IaC succeeds, run: ./Initialize-Installation.ps1 -Mode Cloud -Stage Complete -Environment $Environment -Instance $Instance"
         return
@@ -275,9 +358,35 @@ try {
     $registrationArguments.WebLogoutUri = "$($targets.webEndpoint.TrimEnd('/'))/signout-callback-oidc"
     $registrationArguments.GenerateSecrets = $false
     $registrationArguments.RotateSecrets = $false
-    & "$RepositoryRoot/.azure/scripts/New-EntraDotnetSolution.ps1" @registrationArguments | Out-Null
+    Invoke-SetupRegistrations
+    foreach ($project in @($webProject, $e2eProject) | Where-Object { $_ }) {
+        $values = Get-DotnetUserSecrets $project
+        Save-Settings $project @{ 'EntraExternalId:ClientSecret' = (Read-PrivateSetting 'Client secret (only if missing or for a different registration)' $values 'EntraExternalId:ClientSecret') }
+    }
     Save-Settings $webProject @{ 'BackendApi:BaseUrl' = $apiUrl }
     if ($e2eProject) { Save-Settings $e2eProject @{ 'BackendApi:BaseUrl' = $apiUrl } }
+    $changedSecrets = @{}
+    if ($setupState['WebCredentialsChanged'] -eq 'true') {
+        $webValues = Get-DotnetUserSecrets $webProject
+        $changedSecrets.WEB_CLIENT_ID = $webValues['EntraExternalId:ClientId']
+        $changedSecrets.WEB_CLIENT_SECRET = $webValues['EntraExternalId:ClientSecret']
+    }
+    if ($e2eProject -and $setupState['E2ECredentialsChanged'] -eq 'true') {
+        $e2eValues = Get-DotnetUserSecrets $e2eProject
+        $changedSecrets.E2E_CLIENT_ID = $e2eValues['EntraExternalId:ClientId']
+        $changedSecrets.E2E_CLIENT_SECRET = $e2eValues['EntraExternalId:ClientSecret']
+    }
+    if ($setupState['ApiRegistrationChanged'] -eq 'true') {
+        $apiValues = Get-DotnetUserSecrets $apiProject
+        $changedSecrets.API_CLIENT_ID = $apiValues['EntraExternalId:ClientId']
+    }
+    if ($setupState['SignInConfigurationChanged'] -eq 'true') {
+        $changedSecrets.EEID_INSTANCE = $SignInInstanceUrl
+        $changedSecrets.EEID_TENANT_ID = $SignInTenantId
+    }
+    if ($changedSecrets.Count -gt 0) {
+        Publish-SetupSecrets $changedSecrets @() @($changedSecrets.Keys)
+    }
     if ($targets.sqlServerKind -eq 'EntraOnly') {
         $apiValues = Get-DotnetUserSecrets $apiProject
         $appsJson = az ad app list --display-name $GitHubPrincipalName --output json
@@ -289,6 +398,7 @@ try {
         Write-Host 'Provisioning Entra SQL access with the signed-in workload identity. That identity must be in the configured SQL administrator group.'
         & "$RepositoryRoot/.azure/scripts/sql/Set-AzureSqlManagedIdentityUsers.ps1" -ServerHost $targets.sqlServerHost -DatabaseName $targets.sqlDatabaseName -RuntimeName $targets.apiAppName -RuntimeClientId $targets.apiManagedIdentityClientId -MigrationName "github-$product-$short-$Instance" -MigrationClientId $migrationClientId
     }
+    Complete-SetupSession
     Write-Host "IaC verified and hosted redirects reconciled. Run $product-app.yml with environment=$Environment and runcd=true. SQL-auth users are provisioned automatically by the pipelines."
 }
 finally { Pop-Location }
